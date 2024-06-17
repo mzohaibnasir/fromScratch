@@ -55,3 +55,7 @@ and b
 # so, it tells us how a and b are effecting g.
 
     so, a.grad= 138 means if I slightly nudge a and make slightly larger then slope of growth for g will be 138. This shows how g will respond if we tweak a alittle in +ve direction,
+
+# '+1' is just distributor of gradients
+
+# + mean both exps have positive effect on ouput
