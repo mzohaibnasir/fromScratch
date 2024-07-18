@@ -1,4 +1,4 @@
-# MICROGRAD
+# MICROGRAD- a minimilist deep learning framework
 
 A tiny scalar-valued autograd engine and a small NN library on top of it with pytorch-like API. It implements back propagtation(reverse-mode auto diff) over a dynamically built DAG and a small NN library on top of it with pytorch-like API. Both are tiny with about 100 and 50 lines of code respectively. The DAG only operates over scalar values, so, we chop up each neuron into all of its individual tiny adds and multiplies. However this is enough to build up entire deep NNs doing binary classification, as the demo notebook shows.
 
