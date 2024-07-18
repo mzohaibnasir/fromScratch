@@ -56,6 +56,39 @@ class PositionalEncoding(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
         # positional encodeing shape: seq_len X d_model i.e. each token will be represented (1*d_model) vector
+
+        """
+        
+        formula :`PE(pos,2i) = cos(pos/(10000)**2i/dmodel) for i=1,3,5, ...and `PE(pos,2i) = sin(pos/(10000)**2i/dmodel) for i=2,4,6, ...and `
+        
+        """
+
         #  Create a model of shape (seq_len , d_model)
 
         pe = torch.zeros(seq_len, d_model)
+        #  create a vector of shape(seq_len,1) to represent position of word in sequence
+
+        position = torch.arange(0, seq_len, dtype=torch.float).unsqueeze(1)  # (seq_len,1)  # pos in formula
+        # create denominator of formula
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+
+        # apply sin to even positions
+        pe[:, 0::2] = torch.sin(position * div_term)
+
+        # apply cos to odd positions
+        pe[:, 1::2] = torch.cos(position * div_term)
+
+        # now we need to add batch dimension to these sentences so we can apply it to whole sentences, so to all the batch of sentence, because weill have batch of sentences.
+        # adding batch dim
+        pe = pe.unsqueeze(0)  # (1, seq_len,d_model)
+
+        # register this tensor in buffer of module  .. it is done for the tensor that you want to keep inside the module, not as a lerarned parameter but you want it to be saved when you save the file of the model
+        # you should register it as a buffer. this way the tensor would be saved in file along with state of model
+        self.register_buffer("pe", pe)
+
+    def forward(self, x):
+        """
+        we need to add positional encoding to every token/word inside sequence/sentence
+        """
+        x = x + (self.pe[:, : x.shape[1], :]).requires_grad_(False)  # x:token and pe is positional encoding  # because we dont want to learn pe because these are fixed
+        return self.dropout(x)
