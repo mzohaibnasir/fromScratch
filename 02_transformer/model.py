@@ -5,6 +5,7 @@
 import torch
 import torch.nn as nn
 import math
+import numpy as np
 
 
 class InputEmbeddings(nn.Module):
@@ -84,7 +85,13 @@ class PositionalEncoding(nn.Module):
 
         # register this tensor in buffer of module  .. it is done for the tensor that you want to keep inside the module, not as a lerarned parameter but you want it to be saved when you save the file of the model
         # you should register it as a buffer. this way the tensor would be saved in file along with state of model
-        self.register_buffer("pe", pe)
+        self.register_buffer("pe", pe)  # This is typically used to register a buffer that should not to be considered a model parameter.
+        """
+        Say you have a linear layer nn.Linear. You already have weight and bias parameters. But if you need a new parameter you use register_parameter() to register a new named parameter that is a tensor.
+        When you register a new parameter it will appear inside the module.parameters() iterator, but when you register a buffer it will not.
+        The difference:
+        Buffers are named tensors that do not update gradients at every step, like parameters. For buffers, you create your custom logic (fully up to you).
+        """
 
     def forward(self, x):
         """
@@ -92,3 +99,19 @@ class PositionalEncoding(nn.Module):
         """
         x = x + (self.pe[:, : x.shape[1], :]).requires_grad_(False)  # x:token and pe is positional encoding  # because we dont want to learn pe because these are fixed
         return self.dropout(x)
+
+
+# Example usage
+positional = PositionalEncoding(d_model=4, seq_len=5, dropout=0.5)
+
+# Create an example input tensor (batch size 1, sequence length 5, embedding dimension 20)
+input_tensor = torch.rand(1, 5, 4)
+
+# Apply positional encoding
+output_tensor = positional(input_tensor)
+print("input ", input_tensor)
+
+print("input shape", input_tensor.shape)
+print("output shape", output_tensor.shape)
+
+print(output_tensor)
