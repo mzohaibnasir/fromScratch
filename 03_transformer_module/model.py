@@ -169,3 +169,60 @@ feedforwarded = feedforwardblock(normalized)
 #############################################################################################
 
 # Multi
+
+
+class MultiHeadAttentionBlock(nn.Module):
+    def __init__(self, _d_model: int, h: int, dropout: float):
+        super().__init__()
+        self.d_model = _d_model
+        self.h = h
+        self.dropout = nn.Dropout(dropout)
+
+    @staticmethod
+    def attention(query, key, value, dropout: nn.Dropout):
+        d_k = query.shape[-1]  # extract embedding length
+
+        #(b,h,seq_len,dk)->b,h,seq_len,seq_len)
+        attention_scores = torch.einsum("bhij,bhkj->bhik", query, key)/math.sqrt(d_k)
+
+        if mask is not None:
+            #replace all values with very small number so softwax will assign them 0 in output.
+            attention_scores.masked_fill(mask==0, -1e9)
+        attention_scores = attention_scores.softmax(dim=-1)
+
+        if dropout is not None:
+            attention_scores=dropout(attention_scores)
+        
+        #(b,h,seq_len, seq_len) 
+        return (attention_scores)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
