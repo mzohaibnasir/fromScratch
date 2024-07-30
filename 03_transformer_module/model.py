@@ -18,9 +18,9 @@ class InputEmbeddings(nn.Module):
         self.embedding = nn.Embedding(self.vocab_size, self.d_model)
 
     def forward(self, x):
-        print("\tSampleInputShape: (batch, seq_len) : ", x.shape)
+        print("\tsampleInputShape: (batch, seq_len) : ", x.shape)
         x = self.embedding(x)
-        print("\tInputEmbeddingsReturnShape: (batch, seq_len, d_model) : ",
+        print("\tinputEmbeddingsReturnShape: (batch, seq_len, d_model) : ",
               x.shape)
         return x
 
@@ -80,7 +80,7 @@ class PositionalEncoding(nn.Module):
         """
         x = x + (self.pe[:, :x.shape[1], :]).requires_grad_(False)
         # x:token and pe is positional encoding  # because we dont want to learn pe because these are fixed
-        print("\tPositionalEncodingReturnShape: (batch, seq_len, d_model) : ",
+        print("\tpositionalEncodingReturnShape: (batch, seq_len, d_model) : ",
               x.shape)
 
         #  :x.shape[1]:selecting just # of tokens because of input sequence length.
@@ -104,3 +104,68 @@ positional_encoded = positional(embedded_sentences)
 # print(positional_encoded)  # (1, seq_len,d_model)
 
 ######################################################################################################################
+
+
+class LayerNormalization(nn.Module):
+    def __init__(self, eps: float = 1e-6):
+        super().__init__()
+        self.eps = eps
+        self.alpha = nn.Parameter(torch.ones(1))  # gamma  # mulltiplied
+        self.bias = nn.Parameter(torch.zeros(1))  # added
+
+    def forward(self, x):
+        # print(x.shape)
+        mean = x.mean(dim=-1, keepdim=True)
+        std = x.std(dim=-1, keepdim=True)
+        # print("mean shape", mean.shape, mean)
+        normalized = self.alpha * (x - mean) / (std + self.eps) + self.bias
+
+        print("\tnormalizedReturnShape: (batch, seq_len, d_model) : ",
+              normalized.shape)
+
+        return normalized
+
+
+ln = LayerNormalization()
+
+# print("Before normalization:")
+# print(positional_encoded)
+
+normalized = ln(positional_encoded)
+# print("After normalization:")
+# print(normalized.shape)
+# normalized  # (1, seq_len,d_model)
+
+##########################################################################################
+
+# feed forward network
+
+
+class FeedForwardBlock(nn.Module):
+    def __init__(self,
+                 d_model: int = 512,
+                 d_ff: int = 2048,
+                 dropout: float = 0.5):
+        super().__init__()
+        self.linear_1 = nn.Linear(d_model, d_ff, bias=True)
+        self.dropout = nn.Dropout(dropout)
+        self.linear_2 = nn.Linear(d_ff, d_model, bias=True)
+
+    def forward(self, x):
+        # print("\tbeforeFeedForwardReturnShape: (batch, seq_len, d_model) : ",
+        #       x.shape)
+
+        self.linear_2(self.dropout(torch.relu(self.linear_1(x))))
+        print("\tfeedForwardReturnShape: (batch, seq_len, d_model) : ",
+              x.shape)
+
+        return x
+
+
+feedforwardblock = FeedForwardBlock(d_model=512, d_ff=2048, dropout=0.5)
+
+feedforwarded = feedforwardblock(normalized)
+
+#############################################################################################
+
+# Multi
