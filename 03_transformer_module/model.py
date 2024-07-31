@@ -172,13 +172,13 @@ feedforwarded = feedforwardblock(normalized)
 
 
 class MultiHeadAttentionBlock(nn.Module):
-    def __init__(self, _d_model: int, h: int, dropout: float):
+    def __init__(self, d_model: int, h: int, dropout: float):
         super().__init__()
-        self.d_model = _d_model
+        self.d_model = d_model
         self.h = h
         self.dropout = nn.Dropout(dropout)
-        assert d_model%h ==0, "d_model is not divisible by h"
-        self.d_k = d_model//h
+        assert d_model % h == 0, "d_model is not divisible by h"
+        self.d_k = d_model // h
 
         # weight matrices
         self.wq = nn.Linear(d_model, d_model)
@@ -188,72 +188,106 @@ class MultiHeadAttentionBlock(nn.Module):
         # output matrix :Wo (h*dv, d_model)
         self.wo = nn.Linear(d_model, d_model)
 
-        
     @staticmethod
-    def attention(query, key, value,mask, dropout: nn.Dropout):
+    def attention(query, key, value, mask, dropout: nn.Dropout):
         d_k = query.shape[-1]  # extract embedding length
 
-        #(b,h,seq_len,dk)->b,h,seq_len,seq_len)
-        attention_scores = torch.einsum("bhij,bhkj->bhik", query, key)/math.sqrt(d_k)
+        # (b,h,seq_len,dk)->b,h,seq_len,seq_len)
+        attention_scores = torch.einsum("bhij,bhkj->bhik", query,
+                                        key) / math.sqrt(d_k)
 
         if mask is not None:
-            #replace all values with very small number so softwax will assign them 0 in output.
-            attention_scores.masked_fill(mask==0, -1e9)
+            # replace all values with very small number so softwax will assign them 0 in output.
+            attention_scores.masked_fill(mask == 0, -1e9)
 
         attention_scores = attention_scores.softmax(dim=-1)
 
         if dropout is not None:
-            attention_scores=dropout(attention_scores)
-        
-        #(b,h,seq_len, seq_len) -> (b,h, seq_len, d_k
-        attention_scoresV  = torch.einsum('bhsj, bhsk->bhsk',attention_scores,value)
-        print("\t\tmultiHeadAttentionReturnShape: (batch,heads, seq_len, d_k) : ",
-         attention_scoresV.shape)
+            attention_scores = dropout(attention_scores)
 
+        # (b,h,seq_len, seq_len) -> (b,h, seq_len, d_k
+        attention_scoresV = torch.einsum("bhsj, bhsk->bhsk", attention_scores,
+                                         value)
+        print(
+            "\t\tmultiHeadAttentionReturnShape: (batch,heads, seq_len, d_k) : ",
+            attention_scoresV.shape,
+        )
 
         return (attention_scoresV, attention_scores)
 
-    def forward(self,q,k,v,mask):
-
+    def forward(self, q, k, v, mask):
         query = self.wq(q)
-        query = self.wv(v)
-        query = self.wk(k)
+        value = self.wv(v)
+        key = self.wk(k)
 
-        query = query.view(query.shape[0],query.shape[1],self.h, self.d_k)
+        query = query.view(query.shape[0], query.shape[1], self.h, self.d_k)
         value = value.view(value.shape[0], value.shape[1], self.h, self.d_k)
-        key   = key.view(key.shape[0], key.shape[1], self.h, self.d_k)
-
+        key = key.view(key.shape[0], key.shape[1], self.h, self.d_k)
 
         # swap seq_len and h so that we can consider each head as (seq_len, d_k)
         # (batch, seq_len, h, d_k) -> (batch, h, seq_len, d_k)
 
-                                        
-        query = torch.permutate(query, (0,2,1,3))
-        view = torch.permutate(view, (0,2,1,3))
-        key = torch.permutate(key, (0,2,1,3))
+        query = torch.permute(query, (0, 2, 1, 3))
+        value = torch.permute(value, (0, 2, 1, 3))
+        key = torch.permute(key, (0, 2, 1, 3))
 
-        #(batch
-
-
-
+        # (batch, h,seq_len, d_k)
+        x, self.attention_scores = MultiHeadAttentionBlock.attention(
+            query, key, value, mask=None, dropout=None)
 
 
+        # reverting shape permutation: (batch, h, seq_len, d_k) --> (batch, seq_len, h, d_k)
+        x = torch.permute(x, (0, 2, 1, 3))
+
+        # (batch, seq_len, h, d_k) -->(batch, seq_len, d_model)
+        x = x.contiguous().view(x.shape[0], -1, self.h * self.d_k)
+        x = self.wo(x)
+
+        print("\tmhaReturnShape: (batch, seq_len, d_model) : ", x.shape)
+
+        # (batch, seq_len, d_model
+        return x
+
+
+# Create an instance of MultiHeadAttentionBlock
+MHA = MultiHeadAttentionBlock(d_model=512, h=8, dropout=0.5)
+
+# Create random input tensors
+batch_size = 8
+seq_len = 10
+d_model = 512
+
+# Create random tensors for query, key, and value
+# Shape: (batch_size, seq_len, d_model)
+q = torch.randn(batch_size, seq_len, d_model)
+k = torch.randn(batch_size, seq_len, d_model)
+v = torch.randn(batch_size, seq_len, d_model)
+
+# No mask for this example
+mask = None
+
+# Call the MultiHeadAttentionBlock
+mha = MHA(q, k, v, mask)
+
+##################################################
+
+class ResidualConnection(nn.Module):
+    def __init__(self, dropout:float):
+        super().__init__()
+        self.dropout= nn.Dropout(dropout)
+        self.norm = LayerNormalization()
+
+    def forward(self, x, sublayer):
+        # x is input
+        return x + self.dropout(sublayer(self.norm(x))
 
 
 
+###################################################
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+class EncoderBlock(nn.Module):
+    def __init__(self, self_attention_block:MultiHeadAttentionBlock, feed_forward_block:FeedForwardBlock, dropout:float):
+        pass
+    
