@@ -177,9 +177,20 @@ class MultiHeadAttentionBlock(nn.Module):
         self.d_model = _d_model
         self.h = h
         self.dropout = nn.Dropout(dropout)
+        assert d_model%h ==0, "d_model is not divisible by h"
+        self.d_k = d_model//h
 
+        # weight matrices
+        self.wq = nn.Linear(d_model, d_model)
+        self.wk = nn.Linear(d_model, d_model)
+        self.wv = nn.Linear(d_model, d_model)
+
+        # output matrix :Wo (h*dv, d_model)
+        self.wo = nn.Linear(d_model, d_model)
+
+        
     @staticmethod
-    def attention(query, key, value, dropout: nn.Dropout):
+    def attention(query, key, value,mask, dropout: nn.Dropout):
         d_k = query.shape[-1]  # extract embedding length
 
         #(b,h,seq_len,dk)->b,h,seq_len,seq_len)
@@ -188,20 +199,40 @@ class MultiHeadAttentionBlock(nn.Module):
         if mask is not None:
             #replace all values with very small number so softwax will assign them 0 in output.
             attention_scores.masked_fill(mask==0, -1e9)
+
         attention_scores = attention_scores.softmax(dim=-1)
 
         if dropout is not None:
             attention_scores=dropout(attention_scores)
         
-        #(b,h,seq_len, seq_len) 
-        return (attention_scores)
+        #(b,h,seq_len, seq_len) -> (b,h, seq_len, d_k
+        attention_scoresV  = torch.einsum('bhsj, bhsk->bhsk',attention_scores,value)
+        print("\t\tmultiHeadAttentionReturnShape: (batch,heads, seq_len, d_k) : ",
+         attention_scoresV.shape)
 
 
+        return (attention_scoresV, attention_scores)
+
+    def forward(self,q,k,v,mask):
+
+        query = self.wq(q)
+        query = self.wv(v)
+        query = self.wk(k)
+
+        query = query.view(query.shape[0],query.shape[1],self.h, self.d_k)
+        value = value.view(value.shape[0], value.shape[1], self.h, self.d_k)
+        key   = key.view(key.shape[0], key.shape[1], self.h, self.d_k)
 
 
+        # swap seq_len and h so that we can consider each head as (seq_len, d_k)
+        # (batch, seq_len, h, d_k) -> (batch, h, seq_len, d_k)
 
+                                        
+        query = torch.permutate(query, (0,2,1,3))
+        view = torch.permutate(view, (0,2,1,3))
+        key = torch.permutate(key, (0,2,1,3))
 
-
+        #(batch
 
 
 
