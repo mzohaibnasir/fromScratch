@@ -305,7 +305,7 @@ class EncoderBlock(nn.Module):
 
 
 ###################################################
-# for n encoder blocks
+# for N encoder blocks
 
 
 class Encoder(nn.Module):
