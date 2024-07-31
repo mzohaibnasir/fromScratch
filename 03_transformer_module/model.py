@@ -162,7 +162,7 @@ class FeedForwardBlock(nn.Module):
         return x
 
 
-feedforwardblock = FeedForwardBlock(d_model=512, d_ff=2048, dropout=0.5)
+feedforwardblock = FeedForwardBlock()
 
 feedforwarded = feedforwardblock(normalized)
 
@@ -235,7 +235,6 @@ class MultiHeadAttentionBlock(nn.Module):
         x, self.attention_scores = MultiHeadAttentionBlock.attention(
             query, key, value, mask=None, dropout=None)
 
-
         # reverting shape permutation: (batch, h, seq_len, d_k) --> (batch, seq_len, h, d_k)
         x = torch.permute(x, (0, 2, 1, 3))
 
@@ -271,23 +270,54 @@ mha = MHA(q, k, v, mask)
 
 ##################################################
 
+
 class ResidualConnection(nn.Module):
-    def __init__(self, dropout:float):
+    def __init__(self, dropout: float):
         super().__init__()
-        self.dropout= nn.Dropout(dropout)
+        self.dropout = nn.Dropout(dropout)
         self.norm = LayerNormalization()
 
     def forward(self, x, sublayer):
         # x is input
-        return x + self.dropout(sublayer(self.norm(x))
-
+        return x + self.dropout(sublayer(self.norm(x)))
 
 
 ###################################################
 
 
-
 class EncoderBlock(nn.Module):
-    def __init__(self, self_attention_block:MultiHeadAttentionBlock, feed_forward_block:FeedForwardBlock, dropout:float):
-        pass
-    
+    def __init__(
+        self,
+        self_attention_block: MultiHeadAttentionBlock,
+        feed_forward_block: FeedForwardBlock,
+        dropout: float,
+    ):
+        self.self_attention_block = self_attention_block  # bve
+        self.feed_forward_block = feed_forward_block
+        self.residual_connection = nn.ModuleList(
+            [ResidualConnection(dropout) for _ in range(2)])
+
+    def forward(self, x, src_mask):
+        x = self.residual_connection[0](
+            x, lambda x: self.self_attention_block(x, x, x, src_mask))
+        x = self.residual_connection[1](x, self.feed_forward_block)
+        return x
+
+
+###################################################
+# for n encoder blocks
+
+
+class Encoder(nn.Module):
+    def __init__(self, layers: nn.ModuleList):
+        super().__init__()
+        self.layers = layers  # this would be encoderBlock
+        self.norm = LayerNormalization()  # layerNorm at end
+
+    def forward(self, x, mask):
+        for layer in self.layers:
+            x = layer(x, mask)
+        return self.norm(x)
+
+
+#################################################
