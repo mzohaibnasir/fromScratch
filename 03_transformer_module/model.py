@@ -155,7 +155,7 @@ class FeedForwardBlock(nn.Module):
         # print("\tbeforeFeedForwardReturnShape: (batch, seq_len, d_model) : ",
         #       x.shape)
 
-        self.linear_2(self.dropout(torch.relu(self.linear_1(x))))
+        x = self.linear_2(self.dropout(torch.relu(self.linear_1(x))))
         print("\tfeedForwardReturnShape: (batch, seq_len, d_model) : ",
               x.shape)
 
@@ -299,8 +299,9 @@ class EncoderBlock(nn.Module):
 
     def forward(self, x, src_mask):
         x = self.residual_connection[0](
-            x, lambda x: self.self_attention_block(x, x, x, src_mask))
+        x, lambda x: self.self_attention_block(x, x, x, src_mask))
         x = self.residual_connection[1](x, self.feed_forward_block)
+        print("\tencoderBlockReturnShape: (batch, seq_len, d_model) : ", x.shape)
         return x
 
 
@@ -317,7 +318,40 @@ class Encoder(nn.Module):
     def forward(self, x, mask):
         for layer in self.layers:
             x = layer(x, mask)
+        print("\tencoderBlockReturnShape: (batch, seq_len, d_model) : ", x.shape)
+
         return self.norm(x)
 
 
 #################################################
+
+
+
+# output embeddings are same as input embeddings
+
+class DecoderBlock(nn.Module):
+
+    def __init__(self,
+                 self_attention_block: MultiHeadAttentionBlock,
+                 cross_attention_block: MultiHeadAttentionBlock,
+                 feed_forward_block: FeedForwardBlock,
+                 dropout: float ):
+        super().__init__()
+        self.self_attention_block = self_attention_block
+        self.cross_attention_block=cross_attention_block
+        self.feed_forward_block = feed_forward_block
+        self.residual_connections = nn.ModuleList([ResidualConnection(dropout) for _ in range(3)])
+        self.dropout(dropout)
+
+
+
+
+
+    def forward(self, x, encoder_output, src_mask, tgt_mask):
+        x = self.residual_connections[0](x, lambda t: self.self_head_attention(t,t,t,tgt_mask))
+        x - self.residual_connections[1](x, lambda t: self.cross_attention_block(t, encoder_output,encoder_output,  src_mask))
+        x = self.residual_connections[2](x, self.feed_forward_block)
+        print("\tdecoderBlockReturnShape: (batch, seq_len, d_model) : ", x.shape)
+        return x
+
+
