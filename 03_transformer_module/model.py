@@ -528,13 +528,13 @@ class Transformer(nn.Module):
     # three methods, one to encoder, one to decode and one to project
     # Not creating single forward method because we can reuse output of encoder and to also visualize the attention
 
-    def encoder(self, src, src_mask):
+    def encode(self, src, src_mask):
         src = self.src_embed(src)
         src = self.src_pos(src)
         src = self.encoder(src, mask)
         return src
 
-    def decoder(self, encoder_output, src_mask, tgt, tgt_mask):
+    def decode(self, encoder_output, src_mask, tgt, tgt_mask):
         tgt = self.tgt_embed(tgt)
         tgt = self.tgt_pos(tgt)
         tgt = self.decoder(tgt, encoder_output, src_mask, tgt_mask)
@@ -553,11 +553,11 @@ def build_transformer(
     src_seq_len: int,
     tgt_seq_len: int,
     d_model: int,
+    N: int,
     h: int,
     dropout: float,
     d_ff: int,
-):
-    N = 6
+) -> Transformer:
     """
     we need vocab size of src and tgt so get info about how many vectors to be created
     Keyword arguments:
@@ -618,13 +618,15 @@ def build_transformer(
     return transformer
 
 
-build_transformer(
+transformer = build_transformer(
     src_vocab_size=1000,
     tgt_vocab_size=1000,
     src_seq_len=100,
     tgt_seq_len=100,
     d_model=512,
+    N=6,
     h=8,
     dropout=0.5,
     d_ff=2048,
 )
+print(transformer.e)
