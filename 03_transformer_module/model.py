@@ -292,6 +292,7 @@ class EncoderBlock(nn.Module):
         feed_forward_block: FeedForwardBlock,
         dropout: float,
     ):
+        super().__init__()
         self.self_attention_block = self_attention_block  # bve
         self.feed_forward_block = feed_forward_block
         self.residual_connection = nn.ModuleList(
@@ -299,9 +300,10 @@ class EncoderBlock(nn.Module):
 
     def forward(self, x, src_mask):
         x = self.residual_connection[0](
-        x, lambda x: self.self_attention_block(x, x, x, src_mask))
+            x, lambda x: self.self_attention_block(x, x, x, src_mask))
         x = self.residual_connection[1](x, self.feed_forward_block)
-        print("\tencoderBlockReturnShape: (batch, seq_len, d_model) : ", x.shape)
+        print("\tencoderBlockReturnShape: (batch, seq_len, d_model) : ",
+              x.shape)
         return x
 
 
@@ -317,41 +319,85 @@ class Encoder(nn.Module):
 
     def forward(self, x, mask):
         for layer in self.layers:
+            print("\n\n Block: \n")
             x = layer(x, mask)
-        print("\tencoderBlockReturnShape: (batch, seq_len, d_model) : ", x.shape)
+        x = self.norm(x)
+        print("\nencoderReturnShape: (batch, seq_len, d_model) : ", x.shape)
 
-        return self.norm(x)
+        return x
 
 
 #################################################
 
-
-
 # output embeddings are same as input embeddings
 
-class DecoderBlock(nn.Module):
 
-    def __init__(self,
-                 self_attention_block: MultiHeadAttentionBlock,
-                 cross_attention_block: MultiHeadAttentionBlock,
-                 feed_forward_block: FeedForwardBlock,
-                 dropout: float ):
+class DecoderBlock(nn.Module):
+    def __init__(
+        self,
+        self_attention_block: MultiHeadAttentionBlock,
+        cross_attention_block: MultiHeadAttentionBlock,
+        feed_forward_block: FeedForwardBlock,
+        dropout: float,
+    ):
         super().__init__()
         self.self_attention_block = self_attention_block
-        self.cross_attention_block=cross_attention_block
+        self.cross_attention_block = cross_attention_block
         self.feed_forward_block = feed_forward_block
-        self.residual_connections = nn.ModuleList([ResidualConnection(dropout) for _ in range(3)])
+        self.residual_connections = nn.ModuleList(
+            [ResidualConnection(dropout) for _ in range(3)])
         self.dropout(dropout)
 
-
-
-
-
     def forward(self, x, encoder_output, src_mask, tgt_mask):
-        x = self.residual_connections[0](x, lambda t: self.self_head_attention(t,t,t,tgt_mask))
-        x - self.residual_connections[1](x, lambda t: self.cross_attention_block(t, encoder_output,encoder_output,  src_mask))
+        x = self.residual_connections[0](
+            x, lambda t: self.self_head_attention(t, t, t, tgt_mask))
+        x - self.residual_connections[1](
+            x,
+            lambda t: self.cross_attention_block(t, encoder_output,
+                                                 encoder_output, src_mask),
+        )
         x = self.residual_connections[2](x, self.feed_forward_block)
-        print("\tdecoderBlockReturnShape: (batch, seq_len, d_model) : ", x.shape)
+        print("\tdecoderBlockReturnShape: (batch, seq_len, d_model) : ",
+              x.shape)
         return x
 
+        return self.norm(x)
 
+
+# Example usage
+d_model = 512
+vocab_size = 1000
+seq_len = 35
+dropout = 0.5
+num_layers = 6
+num_heads = 8
+d_ff = 2048
+
+# Create instances
+input_embeddings = InputEmbeddings(d_model=d_model, vocab_size=vocab_size)
+positional_encoding = PositionalEncoding(d_model=d_model,
+                                         seq_len=seq_len,
+                                         dropout=dropout)
+feed_forward_block = FeedForwardBlock(d_model=d_model,
+                                      d_ff=d_ff,
+                                      dropout=dropout)
+self_attention_block = MultiHeadAttentionBlock(d_model=d_model,
+                                               h=num_heads,
+                                               dropout=dropout)
+
+encoder_blocks = nn.ModuleList([
+    EncoderBlock(self_attention_block, feed_forward_block, dropout)
+    for _ in range(num_layers)
+])
+encoder = Encoder(layers=encoder_blocks)
+
+# Create example input
+batch_size = 1
+batch_of_sentences = torch.tensor(
+    [[5, 6, 7, 0, 0]])  # Shape: (batch_size, max_sentence_length)
+embedded_sentences = input_embeddings(batch_of_sentences)
+positional_encoded = positional_encoding(embedded_sentences)
+
+# Run through the encoder
+mask = None  # Assuming no mask for simplicity
+encoder_output = encoder(positional_encoded, mask)
