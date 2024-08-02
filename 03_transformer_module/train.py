@@ -34,3 +34,21 @@ def get_or_build_tokenizer(config, ds, lang):
 
     print("tokenizer initiated!")
     return tokenizer
+
+
+def get_ds(config):
+    ds_raw = load_dataset('opus_books',f'{config["lang_src"]}-{config["lang_tgt"]}')
+
+    # build tokenizer
+    tokenizer_src = get_or_build_tokenizer(config, ds_raw, config['lang_src'])
+    tokenizer_tgt = get_or_build_tokenizer(config, ds_raw, config['lang_tgt'])
+
+    # 90% for training - 10% for testing
+    train_ds_size = int(0.9 * len(ds_raw))
+    val_ds_size = len(ds_raw) - train_ds_size
+
+    train_ds_raw, val_ds_raw = random_split(ds_raw, [train_ds_size, val_ds_size])
+
+    train_ds = 
+
+
