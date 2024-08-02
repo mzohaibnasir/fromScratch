@@ -12,6 +12,7 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from model import build_transformer
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+from config import get_weights_file_path, get_config
 
 
 def get_all_sentences(ds, lang):
@@ -122,3 +123,7 @@ def train_model(config):
     optomizer = torch.optim.Adam(model.parameters(), lr=config["lr"], eps=1e-9)
 
     # Resume training incase model trainig crashes
+    initial_epoch = 0
+    global_epoch = 0
+    if config["preload"]:
+        model_filename = get_weights_file_path(config, config["preload"])

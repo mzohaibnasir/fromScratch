@@ -19,6 +19,7 @@ def get_config():
 
 
 def get_weights_file_path(config, epoch: str):
+    print(f"epoch: {epoch} \n config: {config}")
     model_folder = config["model_folder"]
     model_basename = config["model_basename"]
     model_filename = f"{model_basename}{epoch}.pt"
