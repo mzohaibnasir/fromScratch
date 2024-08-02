@@ -10,6 +10,8 @@ from pathlib import Path
 from dataset import BilingualDataset, causal_mask
 from torch.utils.data import Dataset, DataLoader, random_split
 from model import build_transformer
+from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 
 
 def get_all_sentences(ds, lang):
@@ -101,3 +103,22 @@ def get_model(config, vocab_src_len, vocab_tgt_len):
         config["d_model"],
     )
     return model
+
+
+def train_model(config):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
+    Path(config["model_folder"]).mkdir(parent=True, exists_ok=True)
+
+    train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt = get_ds(config)
+    model = get_model(
+        config, tokenizer_src.get_vocab_size(), tokenizer_tgt.get_vocab_size()
+    ).to(device)
+    # enable tensorboard
+    writer = SummaryWriter(config["experiment_name"])
+
+    # optomizer
+    optomizer = torch.optim.Adam(model.parameters(), lr=config["lr"], eps=1e-9)
+
+    # Resume training incase model trainig crashes
