@@ -184,9 +184,8 @@ def train_model(config):
         batch_iterator = tqdm(train_dataloader,
                               desc=f"Processing epoch: {epoch:02d}")
         for batch in batch_iterator:
-            # print(f"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nbatch: {batch}")
-            break
-        break
+            print(
+                f"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nbatch: {batch.keys()}\n\n\n")
 
 
 config = get_config()
