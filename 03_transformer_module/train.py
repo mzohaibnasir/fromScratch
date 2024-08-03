@@ -21,7 +21,7 @@ def get_all_sentences(ds, lang):
     # print(ds)
     for item in ds:
         sentence = item["translation"][lang]
-        print(f"Sentence ({lang}): {sentence}")
+        # print(f"Sentence ({lang}): {sentence}")
         yield item["translation"][lang]
 
 
@@ -52,17 +52,19 @@ def get_ds(config):
     ds_raw = load_dataset("opus_books",
                           f"{config['lang_src']}-{config['lang_tgt']}",
                           split="train")
+    print(f"\n\n\n\n\n\n\n\nds_raw: {ds_raw}")
 
     # build tokenizer
+    print("Building TOkenizer...")
     tokenizer_src = get_or_build_tokenizer(config, ds_raw, config["lang_src"])
     tokenizer_tgt = get_or_build_tokenizer(config, ds_raw, config["lang_tgt"])
+
     # print(f"\n\n\ntokenizer_src:{tokenizer_src}")
     # print(f"\n\n\ntokenizer_tgt:{tokenizer_tgt}")
 
     # 90% for training - 10% for testing
     train_ds_size = int(0.9 * len(ds_raw))
     val_ds_size = len(ds_raw) - train_ds_size
-
     train_ds_raw, val_ds_raw = random_split(ds_raw,
                                             [train_ds_size, val_ds_size])
 
@@ -74,7 +76,6 @@ def get_ds(config):
         config["lang_tgt"],
         config["seq_len"],
     )
-
     val_ds = BilingualDataset(
         val_ds_raw,
         tokenizer_src,
@@ -90,16 +91,25 @@ def get_ds(config):
         # print("\n\n item:", item)
 
         # load each sentence , convert it to ids using tokenizer and i check length.
-        src_ids = tokenizer_src.encode(
-            item["translation"][config["lang_src"]]).ids
-        tgt_ids = tokenizer_tgt.encode(
-            item["translation"][config["lang_tgt"]]).ids
+        src_sentence = item["translation"][config["lang_src"]]
+        tgt_sentence = item["translation"][config["lang_tgt"]]
+        print(f"Source Sentence : {src_sentence}")
+        # print(f"Target Sentence : {tgt_sentence}")
 
-        #     print("\n\nsrc_ids:", src_ids)
-        #    print("\n\tgt_ids:", tgt_ids)
+        src_ids = tokenizer_src.encode(src_sentence).ids
+        tgt_ids = tokenizer_tgt.encode(tgt_sentence).ids
 
+        print(f"Source Sentence : {src_ids}")
+        # print(f"Target Sentence : {tgt_ids}")
+
+        print(f"Source Sentence Length: {len(src_ids)}")
+        # print(f"Target Sentence Length: {len(tgt_ids)}")
+        # print("\n\nsrc_ids:", src_ids )
+        # print("\n\tgt_ids:", tgt_ids )
         max_len_src = max(max_len_src, len(src_ids))
         max_len_tgt = max(max_len_tgt, len(tgt_ids))
+
+        #############################3
 
     print(f"Max len src:{max_len_src}")
     print(f"Max len tgt:{max_len_tgt}")
@@ -139,8 +149,10 @@ def train_model(config):
 
     train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt = get_ds(
         config)
+
     model = get_model(config, tokenizer_src.get_vocab_size(),
                       tokenizer_tgt.get_vocab_size()).to(device)
+
     # enable tensorboard
     writer = SummaryWriter(config["experiment_name"])
 
@@ -168,13 +180,13 @@ def train_model(config):
     # label_smoothing=0.1 means that for each true label, 10% of the probability mass is redistributed to all other classes.
 
     for epoch in range(initial_epoch, config["num_epochs"]):
-        model.train(
-        )  # model.train() tells your model that you are training the model. This helps inform layers such as Dropout and BatchNorm, which are designed to behave differently during
+        model.train()
+        # model.train() tells your model that you are training the model. This helps inform layers such as Dropout and BatchNorm, which are designed to behave differently during
         # training and evaluation. For instance, in training mode, BatchNorm updates a moving average on each new batch; whereas, for evaluation mode, these updates are frozen.
         batch_iterator = tqdm(train_dataloader,
                               desc=f"Processing epoch: {epoch:02d}")
         for batch in batch_iterator:
-            print(batch)
+            print(f"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nbatch: {batch}")
             break
         break
 
