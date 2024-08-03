@@ -68,8 +68,8 @@ class BilingualDataset(Dataset):
             torch.tensor([self.pad_token] * dec_num_padding_tokens,
                          dtype=torch.int64),
         ])
-
-        print(f"\t\t\t\tPadding added")
+        print("\n")
+        print(f"\t\t\t\tpadding added")
         print(f"\t\t\t\tsequenceTextLimit: {self.seq_len}")
         print(f"\t\t\t\tsrctextShape: {encoder_input.shape}")
         print(f"\t\t\t\ttgttextShape: {decoder_input.shape}")
