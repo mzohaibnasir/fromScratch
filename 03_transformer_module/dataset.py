@@ -105,8 +105,8 @@ def causal_mask(size):
     so we want all values above diagonal to be masked out."""
 
     mask = torch.triu(torch.ones(1, size, size), diagonal=1).type(torch.int)
-    print(mask[:50, :50])
+    # print(mask[:50, :50])
     return mask == 0
 
 
-print(causal_mask(10))
+# print(causal_mask(10))

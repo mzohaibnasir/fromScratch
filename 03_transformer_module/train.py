@@ -28,11 +28,12 @@ def get_all_sentences(ds, lang):
 def get_or_build_tokenizer(config, ds, lang):
     """lang: language to build tokenizer for"""
     # config['tokenizer_file'] = '../tokenizers/tokenizer_{0}'
-    tokenizer_path = Path(config["tokenizer_file"].format(lang))
+    tokenizer_path = Path(
+        config["tokenizer_file"].format(lang))  # mean we can change
     if not Path.exists(tokenizer_path):
         tokenizer = Tokenizer(WordLevel(unk_token="[UNK]"))
         # split by wordspace
-        tokenizer.pre_tokenizers = Whitespace()
+        tokenizer.pre_tokenizer = Whitespace()
         trainer = WordLevelTrainer(
             special_tokens=["[UNK]", "[PAD]", "[SOS]", "[EOS]"],
             min_frequency=2)
@@ -52,7 +53,7 @@ def get_ds(config):
     ds_raw = load_dataset("opus_books",
                           f"{config['lang_src']}-{config['lang_tgt']}",
                           split="train")
-    print(f"\n\n\n\n\n\n\n\nds_raw: {ds_raw}")
+    # print(f"\n\n\n\n\n\n\n\nds_raw: {ds_raw}")
 
     # build tokenizer
     print("Building TOkenizer...")
@@ -93,16 +94,16 @@ def get_ds(config):
         # load each sentence , convert it to ids using tokenizer and i check length.
         src_sentence = item["translation"][config["lang_src"]]
         tgt_sentence = item["translation"][config["lang_tgt"]]
-        print(f"Source Sentence : {src_sentence}")
+        # print(f"Source Sentence : {src_sentence}")
         # print(f"Target Sentence : {tgt_sentence}")
 
         src_ids = tokenizer_src.encode(src_sentence).ids
         tgt_ids = tokenizer_tgt.encode(tgt_sentence).ids
 
-        print(f"Source Sentence : {src_ids}")
+        # print(f"Source Sentence : {src_ids}")
         # print(f"Target Sentence : {tgt_ids}")
 
-        print(f"Source Sentence Length: {len(src_ids)}")
+        # print(f"Source Sentence Length: {len(src_ids)}")
         # print(f"Target Sentence Length: {len(tgt_ids)}")
         # print("\n\nsrc_ids:", src_ids )
         # print("\n\tgt_ids:", tgt_ids )
@@ -111,11 +112,8 @@ def get_ds(config):
 
         #############################3
 
-    print(f"Max len src:{max_len_src}")
-    print(f"Max len tgt:{max_len_tgt}")
-
-    print(f"Max length of src sentence{max_len_src}")
-    print(f"Max length of tgt sentence{max_len_tgt}")
+    print(f"Max len src: {max_len_src}")
+    print(f"Max len tgt: {max_len_tgt}")
 
     # data loader
     train_dataloader = DataLoader(train_ds,
@@ -145,7 +143,7 @@ def train_model(config):
     print(f"Using device: {device}")
 
     Path(config["model_folder"]).mkdir(parents=True, exist_ok=True)
-    print(f"config: {config}")
+    # print(f"config: {config}")
 
     train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt = get_ds(
         config)
@@ -186,7 +184,7 @@ def train_model(config):
         batch_iterator = tqdm(train_dataloader,
                               desc=f"Processing epoch: {epoch:02d}")
         for batch in batch_iterator:
-            print(f"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nbatch: {batch}")
+            # print(f"\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nbatch: {batch}")
             break
         break
 

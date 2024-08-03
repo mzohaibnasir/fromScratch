@@ -26,15 +26,15 @@ class InputEmbeddings(nn.Module):
 
 
 # Example usage
-input_embeddings = InputEmbeddings(d_model=512, vocab_size=1000)
+# input_embeddings = InputEmbeddings(d_model=512, vocab_size=1000)
 # Create an example input tensor (batch size 1, sequence length 5, embedding dimension 20)
-batch_of_sentences = torch.tensor(
-    [[5, 6, 7, 0, 0]])  # Shape: (batch_size, max_sentence_length)
+# batch_of_sentences = torch.tensor(
+# [[5, 6, 7, 0, 0]])  # Shape: (batch_size, max_sentence_length)
 # print(batch_of_sentences.shape)
 
 # Pass through the embedding layer
 # The forward method is called automatically when you use the instance like a function.
-embedded_sentences = input_embeddings(batch_of_sentences)
+# embedded_sentences = input_embeddings(batch_of_sentences)
 # print(
 #     "embedded_sentences.shape: ",
 #     embedded_sentences.shape,
@@ -88,14 +88,14 @@ class PositionalEncoding(nn.Module):
 
 
 # Example usage
-positional = PositionalEncoding(d_model=512, seq_len=35, dropout=0.5)
+# positional = PositionalEncoding(d_model=512, seq_len=35, dropout=0.5)
 # print("positional:", positional)
 
 # Create an example input tensor (batch size , sequence length , embedding dimension )
 
 # print("\n\n\n input to PE", embedded_sentences.shape)
 
-positional_encoded = positional(embedded_sentences)
+# positional_encoded = positional(embedded_sentences)
 # print("input ", embedded_sentences)
 
 # print("input shape", embedded_sentences.shape)
@@ -126,12 +126,12 @@ class LayerNormalization(nn.Module):
         return normalized
 
 
-ln = LayerNormalization()
+# ln = LayerNormalization()
 
 # print("Before normalization:")
 # print(positional_encoded)
 
-normalized = ln(positional_encoded)
+# normalized = ln(positional_encoded)
 # print("After normalization:")
 # print(normalized.shape)
 # normalized  # (1, seq_len,d_model)
@@ -162,9 +162,9 @@ class FeedForwardBlock(nn.Module):
         return x
 
 
-feedforwardblock = FeedForwardBlock()
+# feedforwardblock = FeedForwardBlock()
 
-feedforwarded = feedforwardblock(normalized)
+# feedforwarded = feedforwardblock(normalized)
 
 #############################################################################################
 
@@ -250,25 +250,25 @@ class MultiHeadAttentionBlock(nn.Module):
         return x
 
 
-# Create an instance of MultiHeadAttentionBlock
-MHA = MultiHeadAttentionBlock(d_model=512, h=8, dropout=0.5)
+# # Create an instance of MultiHeadAttentionBlock
+# MHA = MultiHeadAttentionBlock(d_model=512, h=8, dropout=0.5)
 
-# Create random input tensors
-batch_size = 8
-seq_len = 10
-d_model = 512
+# # Create random input tensors
+# batch_size = 8
+# seq_len = 10
+# d_model = 512
 
-# Create random tensors for query, key, and value
-# Shape: (batch_size, seq_len, d_model)
-q = torch.randn(batch_size, seq_len, d_model)
-k = torch.randn(batch_size, seq_len, d_model)
-v = torch.randn(batch_size, seq_len, d_model)
+# # Create random tensors for query, key, and value
+# # Shape: (batch_size, seq_len, d_model)
+# q = torch.randn(batch_size, seq_len, d_model)
+# k = torch.randn(batch_size, seq_len, d_model)
+# v = torch.randn(batch_size, seq_len, d_model)
 
-# No mask for this example
-mask = None
+# # No mask for this example
+# mask = None
 
-# Call the MultiHeadAttentionBlock
-mha = MHA(q, k, v, mask)
+# # Call the MultiHeadAttentionBlock
+# mha = MHA(q, k, v, mask)
 
 ##################################################
 
