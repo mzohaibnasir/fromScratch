@@ -12,14 +12,13 @@ def get_config():
         "lang_tgt": "it",
         "model_folder": "weights",
         "model_basename": "tmodel_",
-        "preload": None,
-        "tokenizer_file": "tokenizer_{0}.json",
-        "experiment_name": "runs/tmodel",  # from tensoflow to keep losses
+        "preload": None,  # preload to restart training if crashed
+        "tokenizer_file": "tokenizer{0}.json",
+        "experiment_name": "runs/tmodel",  # tensorboard
     }
 
 
 def get_weights_file_path(config, epoch: str):
-    print(f"epoch: {epoch} \n config: {config}")
     model_folder = config["model_folder"]
     model_basename = config["model_basename"]
     model_filename = f"{model_basename}{epoch}.pt"
