@@ -256,7 +256,7 @@ class MultiHeadAttentionBlock(nn.Module):
         key = key.view(key.shape[0], key.shape[1], self.h, self.d_k)
 
         print(
-            "\n\n\n\t\t\t\t\t MHA() called: After splitting\n\t\t\t\t\t\tquery: (batch, seq_len, head, d_model) : ",
+            "\n\n\n\t\t\t\t\t\tAfter splitting\n\t\t\t\t\t\tquery: (batch, seq_len, head, d_model) : ",
             query.shape,
         )
 
@@ -271,7 +271,7 @@ class MultiHeadAttentionBlock(nn.Module):
         key = key.permute(0, 2, 1, 3)
 
         print(
-            "\n\n\n\t\t\t\t\t MHA() called: After permutation \n\t\t\t\t\t\tquery: (batch, heads, seq_len, d_model) : ",
+            "\n\n\n\t\t\t\t\t\tAfter permutation \n\t\t\t\t\t\tquery: (batch, heads, seq_len, d_model) : ",
             query.shape,
         )
 
@@ -473,7 +473,9 @@ class ProjectionLayer(nn.Module):
 
     def forward(self, x):
         x = torch.log_softmax(self.proj(x), dim=-1)
-        print("\n\tprojectionLayerReturnShape: (batch, seq_len, vocab_size) : ", x.shape)
+        print(
+            "\n\tprojectionLayerReturnShape: (batch, seq_len, vocab_size) : ", x.shape
+        )
         return x
 
 

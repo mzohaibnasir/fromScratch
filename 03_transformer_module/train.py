@@ -15,6 +15,61 @@ from tqdm import tqdm
 from config import get_weights_file_path, get_config
 from tqdm import tqdm
 
+# validation
+
+
+def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt,
+                  max_len, device):
+    sos_idx = tokenizer_tgt.token_to_id("[SOS]")
+    eos_idx = tokenizer_tgt.token_to_id("[EOS]")
+
+    # precompute the encoder output
+    encoder_output = model.encodei(source, source_mask)
+
+    # initialize decoder_input with sos token
+    decoder_input = torch.empty(1, 1)
+    pass
+
+
+def run_validation(
+    model,
+    validation_ds,
+    tokenizer_src,
+    tokenizer_tgt,
+    max_len,
+    device,
+    print_msg,
+    global_state,
+    writer,
+    num_examples=2,
+):
+    mode.eval()  # tells python that we'll be evaluating model
+    count = 0
+    # we'll be inferencing `num_examples` sentences  and analyze ouput of model
+    source_texts = []
+    expected = []
+    predicted = []
+
+    # size of control window (just use a default value)
+    console_width = 80
+    with torch.no_grad():  # disabling gradient calcuation
+        for batch in validation_ds:
+            # validation_ds has batch_size=1
+            count += 1  # we only want to inference two sentences, so we'll keep a counT OF how many we have
+
+            encoder_input = batch["encoder_input"].to(device)
+            encoder_mask = batch["encoder_mask"].to(device)
+            # verify size of batch is 1
+            assert encoder_input.size(
+                0) == 1, "batch_size must be 1 for validation"
+            # for inference, we are supposed to calculate encoder output just once, and reuse it for every token that model will output from decoder.
+            # because encoder output is calculated first,  parallelly, beacuse it represents the fixed input sequence which remains constant while the decoder generates the
+            # output sequence token by token ie. not parallel. encoder is supposed to create a rich representation of input sequence so it can be fed at one. but decoder generates one token at a time
+            # so we'll be doing greedy decoding
+            encoder_input = batch["encoder_input"].to(device)
+            encoder_input = batch["encoder_input"].to(device)
+    pass
+
 
 def get_all_sentences(ds, lang):
     # pasrsing each item which is a pair in dataset # (english, italian)
@@ -28,17 +83,19 @@ def get_all_sentences(ds, lang):
 def get_or_build_tokenizer(config, ds, lang):
     """lang: language to build tokenizer for"""
     # config['tokenizer_file'] = '../tokenizers/tokenizer_{0}'
-    tokenizer_path = Path(config["tokenizer_file"].format(lang))  # mean we can change
+    tokenizer_path = Path(
+        config["tokenizer_file"].format(lang))  # mean we can change
     if not Path.exists(tokenizer_path):
         tokenizer = Tokenizer(WordLevel(unk_token="[UNK]"))
         # split by wordspace
         tokenizer.pre_tokenizer = Whitespace()
         trainer = WordLevelTrainer(
-            special_tokens=["[UNK]", "[PAD]", "[SOS]", "[EOS]"], min_frequency=2
-        )
+            special_tokens=["[UNK]", "[PAD]", "[SOS]", "[EOS]"],
+            min_frequency=2)
 
         print("tokenizer training started...")
-        tokenizer.train_from_iterator(get_all_sentences(ds, lang), trainer=trainer)
+        tokenizer.train_from_iterator(get_all_sentences(ds, lang),
+                                      trainer=trainer)
         tokenizer.save(str(tokenizer_path))
     else:
         tokenizer = Tokenizer.from_file(str(tokenizer_path))
@@ -48,9 +105,9 @@ def get_or_build_tokenizer(config, ds, lang):
 
 
 def get_ds(config):
-    ds_raw = load_dataset(
-        "opus_books", f"{config['lang_src']}-{config['lang_tgt']}", split="train"
-    )
+    ds_raw = load_dataset("opus_books",
+                          f"{config['lang_src']}-{config['lang_tgt']}",
+                          split="train")
     # print(f"\n\n\n\n\n\n\n\nds_raw: {ds_raw}")
 
     # build tokenizer
@@ -64,7 +121,8 @@ def get_ds(config):
     # 90% for training - 10% for testing
     train_ds_size = int(0.9 * len(ds_raw))
     val_ds_size = len(ds_raw) - train_ds_size
-    train_ds_raw, val_ds_raw = random_split(ds_raw, [train_ds_size, val_ds_size])
+    train_ds_raw, val_ds_raw = random_split(ds_raw,
+                                            [train_ds_size, val_ds_size])
 
     train_ds = BilingualDataset(
         train_ds_raw,
@@ -113,9 +171,9 @@ def get_ds(config):
     print(f"Max len tgt: {max_len_tgt}")
 
     # data loader
-    train_dataloader = DataLoader(
-        train_ds, batch_size=config["batch_size"], shuffle=True
-    )
+    train_dataloader = DataLoader(train_ds,
+                                  batch_size=config["batch_size"],
+                                  shuffle=True)
     val_dataloader = DataLoader(
         val_ds, batch_size=1, shuffle=True
     )  # batch_size=1 because we want to process each sentence one by one
@@ -142,11 +200,11 @@ def train_model(config):
     Path(config["model_folder"]).mkdir(parents=True, exist_ok=True)
     # print(f"config: {config}")
 
-    train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt = get_ds(config)
+    train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt = get_ds(
+        config)
 
-    model = get_model(
-        config, tokenizer_src.get_vocab_size(), tokenizer_tgt.get_vocab_size()
-    ).to(device)
+    model = get_model(config, tokenizer_src.get_vocab_size(),
+                      tokenizer_tgt.get_vocab_size()).to(device)
 
     # enable tensorboard
     writer = SummaryWriter(config["experiment_name"])
@@ -168,8 +226,7 @@ def train_model(config):
 
     # loss fn
     loss_fn = nn.CrossEntropyLoss(
-        ignore_index=tokenizer_src.token_to_id("[PAD]"), label_smoothing=0.1
-    )
+        ignore_index=tokenizer_src.token_to_id("[PAD]"), label_smoothing=0.1)
     # ignore_index: To ignore padding tokens so that they don't have any impact on calculating loss
     # Label smoothing is a technique used to smooth the target labels by assigning a small probability to the incorrect classes and reducing the confidence on the correct class.
     # This helps prevent the model from becoming too confident and overfitting to the training data.
@@ -179,17 +236,25 @@ def train_model(config):
         model.train()
         # model.train() tells your model that you are training the model. This helps inform layers such as Dropout and BatchNorm, which are designed to behave differently during
         # training and evaluation. For instance, in training mode, BatchNorm updates a moving average on each new batch; whereas, for evaluation mode, these updates are frozen.
-        batch_iterator = tqdm(train_dataloader, desc=f"Processing epoch: {epoch:02d}")
+        batch_iterator = tqdm(train_dataloader,
+                              desc=f"Processing epoch: {epoch:02d}")
         for batch in batch_iterator:
             # print(f"batch: {batch.keys()}\n\n\n")
 
-            encoder_input = batch["encoder_input"].to(device)  # (batch, seq_len)
-            decoder_input = batch["decoder_input"].to(device)  # (batch, seq_len)
-            encoder_mask = batch["encoder_mask"].to(device)  # (batch, 1, 1, seq_len)
+            encoder_input = batch["encoder_input"].to(
+                device)  # (batch, seq_len)
+            decoder_input = batch["decoder_input"].to(
+                device)  # (batch, seq_len)
+            encoder_mask = batch["encoder_mask"].to(
+                device)  # (batch, 1, 1, seq_len)
             decoder_mask = batch["decoder_mask"].to(device)
 
-            print(f"\t\t\t\t\tencoder_input (batch, seq_len): {encoder_input.shape}")
-            print(f"\t\t\t\t\tdecoder_input (batch, seq_len): {decoder_input.shape}")
+            print(
+                f"\t\t\t\t\tencoder_input (batch, seq_len): {encoder_input.shape}"
+            )
+            print(
+                f"\t\t\t\t\tdecoder_input (batch, seq_len): {decoder_input.shape}"
+            )
             # print(
             #     f"\t\t\t\t\tencoder_mask (1, batch, seq,_len): {len(encoder_mask)}"
             # )
@@ -204,9 +269,8 @@ def train_model(config):
 
             # run through transformer modules
             encoder_output = model.encode(encoder_input, encoder_mask)
-            decoder_output = model.decode(
-                encoder_output, encoder_mask, decoder_input, decoder_mask
-            )
+            decoder_output = model.decode(encoder_output, encoder_mask,
+                                          decoder_input, decoder_mask)
             proj_output = model.project(decoder_output)
             print(
                 f"\t\t\t\t\tprojected layer (batch, seq_len, vocab_size): {proj_output.shape}"
@@ -224,6 +288,21 @@ def train_model(config):
 
             loss = loss_fn(proj_output, label)
             batch_iterator.set_postfix({"loss": f"{loss.item():6.3f}"})
+            """
+            The intuition behind using the reshaped projected output tensor `(batch*seq_len, vocab_size)` and the reshaped target sequence tensor `(batch*seq_len)` as inputs
+            to the cross-entropy loss function is to compare the predicted probability distribution over the vocabulary for each position in the sequence with the true label 
+            for that position. 
+            The projected output tensor `(batch*seq_len, vocab_size)` is a tensor that contains the predicted probability distribution over the vocabulary for each position 
+            in the sequence. Each row of the tensor corresponds to a position in the sequence, and each column corresponds to a word in the vocabulary. The value in each 
+            cell is the predicted probability of that word appearing at that position in the sequence.
+            The target sequence tensor `(batch*seq_len)` is a tensor that contains the true label for each position in the sequence. Each element of the tensor is an integer
+            that corresponds to the index of the true word in the vocabulary.The cross-entropy loss function calculates the loss between the predicted probability distribution 
+            and the true label for each position in the sequence. It does this by taking the negative log-likelihood of the true label given the predicted probability distribution.
+            The loss is then averaged over all positions in the sequence to get the final loss value.
+            By reshaping the projected output tensor and the target sequence tensor to have the same shape `(batch*seq_len)`, we can compare the predicted probability distribution 
+            and the true label for each position in the sequence. This allows us to update the model parameters in a way that minimizes the loss and improves the accuracy of the model.
+            """
+
             # loss loss
             writer.add_scalar("train_loss", loss.item(), global_step)
             writer.flush()
