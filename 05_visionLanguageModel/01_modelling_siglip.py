@@ -58,9 +58,13 @@ class SiglipVisionEmbeddings(nn.Module):
         self.num_positions = (
             self.num_patches
         )  # positional encidings are equal to number of patches becasue we need the inforrmation about where each patch is in the image.
+
+        # [1, self.num_positions] -> [1, self.num_positions, self.embed_dim]
         self.position_embedding = nn.Embedding(
             self.num_positions, self.embed_dim
         )  # this vector is same size of partch embedding vector  # each of this will be added to patvh_embedding vector
+
+        # [1, self.num_positions]
         self.register_buffer(
             "position_ids",
             torch.arange(self.num_positions).expand((1, -1)),
