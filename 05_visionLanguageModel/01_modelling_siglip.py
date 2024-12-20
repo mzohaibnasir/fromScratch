@@ -23,15 +23,67 @@ class SiglipVisionConfig:
         super().__init__()
 
         self.hidden_size = hidden_size
-        self.intermediate_size = (intermediate_size,)
-        self.num_hidden_layers = (num_hidden_layers,)
-        self.num_attention_heads = (num_attention_heads,)
-        self.num_channels = (num_channels,)
-        self.image_size = (image_size,)
-        self.patch_size = (patch_size,)
-        self.layer_norm_eps = (layer_norm_eps,)
-        self.attention_dropout = (attention_dropout,)
+        self.intermediate_size = intermediate_size
+        self.num_hidden_layers = num_hidden_layers
+        self.num_attention_heads = num_attention_heads
+        self.num_channels = num_channels
+        self.image_size = image_size
+        self.patch_size = patch_size
+        self.layer_norm_eps = layer_norm_eps
+        self.attention_dropout = attention_dropout
         self.num_image_tokens = num_image_tokens
+
+
+class SiglipVisionEmbeddings(nn.Module):
+    def __init__(self, config: SiglipVisionConfig):
+        super().__init__()
+        self.config = config
+        self.image_size = config.image_size
+        self.patch_size = config.patch_size
+        self.num_channels = config.num_channels
+        self.embed_dim = config.hidden_size
+
+        # embeddings are being extracted patch by patch with nok overlapping
+        self.patch_embedding = nn.Conv2d(
+            in_channels=self.num_channels,
+            out_channels=self.embed_dim,  # hidden size  # mean series of embedding
+            kernel_size=self.patch_size,
+            stride=self.patch_size,  # all patches are non-overlapping
+            padding="valid",  # no padding added
+        )  # [ batch,size, no. of f patches, embed_dim]
+        # image_size = 224, for baese version of poligemma
+        self.num_patches = (
+            self.image_size // self.patch_size
+        ) ** 2  # **2 because of 2D image i.e. 16 * 16
+        self.num_positions = (
+            self.num_patches
+        )  # positional encidings are equal to number of patches becasue we need the inforrmation about where each patch is in the image.
+        self.position_embedding = nn.Embedding(
+            self.num_positions, self.embed_dim
+        )  # this vector is same size of partch embedding vector  # each of this will be added to patvh_embedding vector
+        self.register_buffer(
+            "position_ids",
+            torch.arange(self.num_positions).expand((1, -1)),
+            persistent=False,
+        )
+
+    def forward(self, pixel_values: torch.FloatTensor) -> torch.Tensor:
+        _, _, height, width = (
+            pixel_values.shape
+        )  # [batch_size, num_channels, height, width]
+        # Convolve the `patch_size` kernel over the image, with no overlapping patches since the stride is equal to the kernel size
+        # The output of the convolution will have shape [Batch_Size, Embed_Dim, Num_Patches_H, Num_Patches_W]
+        # where Num_Patches_H = height // patch_size and Num_Patches_W = width // patch_size
+        patch_embeds = self.patch_embedding(pixel_values)
+        # [Batch_Size, Embed_Dim, Num_Patches_H, Num_Patches_W] -> [Batch_Size, Embed_Dim, Num_Patches]
+        # where Num_Patches = Num_Patches_H * Num_Patches_W
+        embeddings = patch_embeds.flatten(2)
+        # [Batch_Size, Embed_Dim, Num_Patches] -> [Batch_Size, Num_Patches, Embed_Dim]
+        embeddings = embeddings.transpose(1, 2)
+        # Add position embeddings to each patch. Each positional encoding is a vector of size [Embed_Dim]
+        embeddings = embeddings + self.position_embedding(self.position_ids)
+        # [Batch_Size, Num_Patches, Embed_Dim]
+        return embeddings
 
 
 class SiglipVisionTransformer(nn.Module):
