@@ -91,12 +91,51 @@ class SiglipVisionEmbeddings(nn.Module):
 
 
 class SiglipMLP(nn.Module):
+    """
+    to add non linearity and trainable parameters
+    """
+
     def __init__(self, config: SiglipVisionConfig):
         super().__init__()
         self.config = config
-        self.fc1 = nn.Linear(self.config.hidden_size, config.intermediate_size)
+        self.fc1 = nn.Linear(
+            self.config.hidden_size, config.intermediate_size
+        )  # intermediate size is 3072.. 4 times of hidden size
         self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
-        self.act = nn.GELU()
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        # [batch_size, num_patches, hidden_size] -> [batch_size, num_patches, intermediate_size]
+        hidden_states = self.fc1(hidden_states)
+        # [batch_size, num_patches, intermediate_size]
+        hidden_states = nn.functional.gelu(hidden_states, approximate="tanh")
+        # [batch_size, num_patches, intermediate_size] -> [batch_size, num_patches, hidden_size]
+        hidden_states = self.fc2(hidden_states)
+        return hidden_states
+
+
+class SiglipAttention(nn.Module):
+    """Multi-head attention from 'Attention is All You Need' paper"""
+
+    def __init__(self, config: SiglipVisionConfig):
+        super().__init__()
+        self.config = config
+        self.embed_dim = config.hidden_size
+        self.num_heads = config.num_attention_heads
+        self.head_dim = self.embed_dim // self.num_heads
+        self.scale = self.head_dim**-0.5  # equivalent to 1/sqrt(head_dim)
+        self.dropout = config.attention_dropout
+
+        self.k_proj = nn.Linear(self.embed_dim, self.embed_dim)  # Wk
+        self.v_proj = nn.Linear(self.embed_dim, self.embed_dim)  # Wv
+        self.q_proj = nn.Linear(self.embed_dim, self.embed_dim)  # Wq
+        self.out_proj = nn.Linear(self.embed_dim, self.embed_dim)  # Wo
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        # hidden_states: [batch_size, num_patches, embed_dim]
+        batch_
 
 
 class SiglipEncoderLayer(nn.Module):
