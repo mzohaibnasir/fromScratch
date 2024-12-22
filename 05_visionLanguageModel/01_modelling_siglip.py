@@ -125,6 +125,7 @@ class SiglipAttention(nn.Module):
         self.scale = self.head_dim**-0.5  # equivalent to 1/sqrt(head_dim)
         self.dropout = config.attention_dropout
 
+        # parameter matrices for key, query, value
         self.k_proj = nn.Linear(self.embed_dim, self.embed_dim)  # Wk
         self.v_proj = nn.Linear(self.embed_dim, self.embed_dim)  # Wv
         self.q_proj = nn.Linear(self.embed_dim, self.embed_dim)  # Wq
@@ -134,8 +135,41 @@ class SiglipAttention(nn.Module):
         self,
         hidden_states: torch.Tensor,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        # k,q,v are just transformations of input sequence
+
         # hidden_states: [batch_size, num_patches, embed_dim]
-        batch_
+        batch_size, seq_len, embed_dim = hidden_states.size()
+
+        # query_states: [batch_size, num_patches, embed_dim]
+        query_states = self.q_proj(hidden_states)
+
+        # key_states: [batch_size, num_patches, embed_dim]
+        key_states = self.k_proj(hidden_states)
+
+        # value_states: [batch_size, num_patches, embed_dim]
+        value_states = self.v_proj(hidden_states)
+
+        # we do this because the self-attention mehanism needs to see same sequence in three different ways as k,q and v
+
+        # split each token into smaller tkoens based on number of heads
+        # each head focus on different part of the sequence and each head is independent too
+
+        # query_states: [batch_size, num_patches, embed_dim] -> [batch_size, num_patches, num_heads=8, head_dim] -> [batch_size, num_heads, num_patches, head_dim]
+        query_states = query_states.view(
+            batch_size, seq_len, self.num_heads, self.head_dim
+        ).transpose(1, 2)
+        key_states = key_states.view(
+            batch_size, seq_len, self.num_heads, self.head_dim
+        ).transpose(1, 2)
+        value_states = value_states.view(
+            batch_size, seq_len, self.num_heads, self.head_dim
+        ).transpose(1, 2)
+
+        # calculate the attention scores using the scaled dot-product method formula : Q.K^T / sqrt(d_k)
+        # [batch_size, num_heads, num_patches, head_dim] * [batch_size, num_heads, head_dim, num_patches] -> [batch_size, num_heads, num_patches, num_patches]
+        attn_weights = (
+            torch.matmul(query_states, key_states.transpose(2, 3)) * self.scale
+        )
 
 
 class SiglipEncoderLayer(nn.Module):
