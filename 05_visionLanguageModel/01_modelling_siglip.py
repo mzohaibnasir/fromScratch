@@ -18,7 +18,7 @@ class SiglipVisionConfig:
         layer_norm_eps=1e-6,
         attention_dropout=0.0,
         num_image_tokens: int = None,  # how many output embedding we will have for each image; each of these contextualized embedding will be considered as a tokens of image.It wont ba a one single embrding that represents whole imagebut list of embeddings that represesnt a patch of each image and als info about other patches throigh the attention mechanismo
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
 
@@ -171,6 +171,40 @@ class SiglipAttention(nn.Module):
             torch.matmul(query_states, key_states.transpose(2, 3)) * self.scale
         )
 
+        if attn_weights.size() != (batch_size, self.num_heads, seq_len, seq_len):
+            raise ValueError(
+                f"Attention weights should have the shape [batch_size, num_heads, seq_len, seq_len], but got {attn_weights.size()}"
+            )
+
+        # apply softmax to the attention weights
+        attn_weights = nn.functional.softmax(
+            attn_weights, dim=-1, dtype=torch.float32
+        ).to(query_states.dtype)
+
+        # apply dropout to the attention weights
+        attn_weights = nn.functional.dropout(
+            attn_weights, p=self.dropout, training=self.training
+        )
+
+        # multiply the attention weights with the value_states,
+        # -> [batch_size, num_heads, num_patches, head_dim]
+        attn_output = torch.matmul(attn_weights, value_states)
+
+        if attn_output.size() != (batch_size, self.num_heads, seq_len, self.head_dim):
+            raise ValueError(
+                f"Attention outputs should have the shape [batch_size, num_heads, seq_len, head_dim], but got {attn_output.size()}"
+            )
+
+        # [batch_size, num_heads, num_patches, head_dim] -> [batch_size, num_patches, num_heads, head_dim]
+        attn_output = attn_output.transpose(
+            1, 2
+        ).contiguous()  # contiguous() is used to make sure that the tensor is stored in a contiguous chunk of memory which means that the tensor is stored in a single memory block and the entries are stored in a single order.
+
+        # [batch_size, num_patches, num_heads, head_dim] -> [batch_size, num_patches, embed_dim]
+        attn_output = attn_output.reshape(
+            batch_size, seq_len, self.embed_dim
+        )  ## reshape just changes stride of tensor without changing the layout of the tensor
+
 
 class SiglipEncoderLayer(nn.Module):
     def __init__(self, config: SiglipVisionConfig):
@@ -198,6 +232,23 @@ class SiglipEncoderLayer(nn.Module):
         hidden_states = self.mlp(hidden_states)  # mlp adds non-linearity and parameters
         # [batch_size, num_patches, embed_dim/hidden_size]
         hidden_states = hidden_states + residual
+        return hidden_states
+
+
+class SiglipEncoder(nn.Module):
+    def __init__(self, config: SiglipVisionConfig):
+        super().__init__()
+        self.config = config
+        self.layer = nn.ModuleList(
+            [SiglipEncoderLayer(config) for _ in range(config.num_hidden_layers)]
+        )
+
+    def forward(self, input_embds: torch.Tensor) -> torch.Tensor:
+        # input_embds: [batch_size, num_patches, embed_dim]
+        hidden_states = input_embds
+        for layer_block in self.layer:
+            # [batch_size, num_patches, embed_dim] -> [batch_size, num_patches, embed_dim]
+            hidden_states = layer_block(hidden_states)
         return hidden_states
 
 
