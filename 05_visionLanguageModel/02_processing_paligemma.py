@@ -6,8 +6,93 @@ import torch
 # https://github.com/google-research/big_vision/blob/main/big_vision/configs/proj/paligemma/README.md
 
 IMAGENET_STANDARD_MEAN = [0.5, 0.5, 0.5]
-IMAGENET_STANDARD_STD = [0.5, 0.5, 0.5]
+IMAGENET_STANDARD_STD = [0.5, 0.5, 0.5] # # we gererallyuse mean and std of imagenet dataset, one for each channel
 
+
+
+
+def add_image_token_to_prompt(
+          prefix_prompt, # user prompt
+          bos_token,
+          image_seq_len,
+          image_token,
+          ):
+    """
+    # Quoting from the blog (https://huggingface.co/blog/paligemma#detailed-inference-process):
+    #   The input text is tokenized normally. 
+    #   A <bos> token is added at the beginning, and an additional newline token (\n) is appended. newline token is added to the end of the prompt telling the model that the prompt has ended.
+    #   This newline token is an essential part of the input prompt the model was trained with, so adding it explicitly ensures it's always there.
+    #   The tokenized text is also prefixed with a fixed number of <image> tokens.
+    # NOTE: from the paper it looks like the `\n` should be tokenized separately, but in the HF implementation this is not done.
+    #       ref to HF implementation: https://github.com/huggingface/transformers/blob/7f79a97399bb52aad8460e1da2f36577d5dccfed/src/transformers/models/paligemma/processing_paligemma.py#L55-L73
+    """
+
+
+
+    # we will add image tokens based on how many image tokens this model needs. incase of paiigemma-224, it is 256 image tokens
+    return f"{image_token*image_seq_len}{bos_token}{prefix_prompt}\n"
+
+    # "tell me where is photographer\n"  =>photographer\n might becaome a single token so we dont wwant \n to be merged theredire add \n seraprartely/manually
+
+
+def resize(image: Image,
+           size: Tuple[int, int], 
+           resample: Image.Resampling = None,
+           reducing_gap: Optional[int] = None,
+           ) -> np.ndarray:
+       height, width = size
+       resized_image = image.resize(
+            (width, height), 
+            resample=resample,
+            reducing_gap=reducing_gap
+            )
+       return resized_image
+
+
+def rescale(image: np.ndarray, 
+            scale: float,
+            dtype : np.dtype = np.float32
+            ) -> np.ndarray:
+      rescaled_image = image.astype(dtype) * scale
+      rescaled_image = rescaled_image.astype(dtype)
+      return rescaled_image
+
+
+def normalize(image: np.ndarray,
+                mean: Union[float, Iterable[float]],
+                std: Union[float, Iterable[float]],
+                ) -> np.ndarray:
+        mean = np.array(mean)
+        std = np.array(std)
+        image = (image - mean) / std
+        return image
+
+def process_images(
+        images: List[Image.Image],
+        size: Dict[str, int]= None,
+        resample: Image.Resampling = None,
+        rescale_factor: float = None,
+        image_mean: Optional[Union[float, List[float]]] = None, # we gererally use mean and std of imagenet dataset
+        image_std: Optional[Union[float, List[float]]] = None,
+)-> List[np.ndarray]:
+    height, width = size[0], size[1]
+    images = [
+        resize(image=image, size=(height, width), resample=resample) for image in images
+    ]
+
+    # convert images to numpy arrays
+    images = [np.array(image) for image in images]
+
+    # rescale the pixel values to be in the range [0, 1]
+    images = [rescale(image, scale=rescale_factor) for image in images]
+
+    # normalize the images to have mean 0 and std 1
+    images = [normalize(image, mean=image_mean, std=image_std) for image in images]
+
+    # move the channel dimension to the front
+    # the model expects the images to be in the format [channel, height, width]
+    images = [image.transpose(2, 0, 1) for image in images]
+    return images
 
 class PaliGemmaProcessor:
     """
@@ -68,11 +153,12 @@ class PaliGemmaProcessor:
             rescale_factor=1.0/255.0,
             image_mean = IMAGENET_STANDARD_MEAN,
             image_std = IMAGENET_STANDARD_STD,
-        ) # it woill load rescale normalize the image and convert it to tensor that can be processed by vision model    
+        ) # it woill load rescale normalize the image and convert it to tensor that can be processed by vision model. It returns list of tensors   
 
 
         # convert the returned list of numpy arrays to a single numpy array with shape [batch_size, channel, height, width[]
-        pixel_values = np.stack(pixel_values, axis=0)
+        # here we are getting stack of images
+        pixel_values = np.stack(pixel_values, axis=0) # adding batch size
 
         # convert the numpy array to a torch tensor
         pixel_values = torch.tensor(pixel_values)
@@ -90,11 +176,12 @@ class PaliGemmaProcessor:
             )
             for prompt in text
             
-        ]
+        ]#  tokeniing is not happeininghere.. and image placeholders are being added here # returns strings includin image polaceholder tokens
 
 
-        # we tokenize it using placehodler tokens fo rimage
-        # returns input ids and attention mask
+        # we tokenize it NOW.
+        # returns input ids(not embeddings) and attention mask
+        # as we are not using padding, so attention_mask will be just 1
         inputs = self.tokenizer(
             input_strings,
             padding=padding,
@@ -102,6 +189,7 @@ class PaliGemmaProcessor:
             return_tensors="pt",
         )
 
-        return_data = {"pixel_values": pixel_values,**inputs]}
+        return_data = {"pixel_values": pixel_values,**inputs]} # returning pixel values and tokenized input ids
 
         return return_data
+    
