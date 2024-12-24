@@ -11,6 +11,40 @@ from torch.nn import CrossEntropyLoss
 import math
 from 01_modelling_siglip import SiglipVisionConfig, SiglipVisionModel
 
+class GemmaConfig():
+    def __init__(
+            self,
+            vocab_size,
+            hidden_size, # embedding vector size
+            intermediate_size, # intermediate size of ff layer
+            num_hidden_layers, # number of layers transformer has
+            # group query attention : different number of head for query and different number of heads for key and value
+            num_attention_heads, # number of query heads
+            num_key_value_heads, # number of key value heads
+            head_dim=256, # d_head
+            max_position_embeddings = 8192, # max number of postions  our model has been trained upon
+            rms_norm_eps = 1e-6, # rms normalizaion
+            rope_theta = 10000.0, # rotatory position encoding: base frequency
+            attention_bias = False, # as we know wk, wq, wv are linear layers so we can have bias terms
+            attention_dropout = 0.0,
+            pad_token_id = None,
+            **kwargs,
+        ):
+            super().__init__()
+            self.vocab_size = vocab_size
+            self.max_position_embeddings = max_position_embeddings
+            self.hidden_size = hidden_size
+            self.intermediate_size = intermediate_size
+            self.num_hidden_layers = num_hidden_layers
+            self.num_attention_heads = num_attention_heads
+            self.head_dim = head_dim
+            self.num_key_value_heads = num_key_value_heads
+            self.rms_norm_eps = rms_norm_eps
+            self.rope_theta = rope_theta
+            self.attention_bias = attention_bias
+            self.attention_dropout = attention_dropout
+            self.pad_token_id = pad_token_id
+
 
 
 class PaliGemmaConfig():
@@ -43,7 +77,7 @@ class PaliGemmaConfig():
         self.text_config = GemmaConfig(**text_config, pad_token_id=pad_token_id)
         self.vocab_size = self.text_config.vocab_size
 
-        self.text_config.num_image_tokens = (self.vision_config.image_size // self.vision_config.patch_size)**2
+        self.text_config.num_image_tokens = (self.vision_config.image_size // self.vision_config.patch_size)**2 # meaning how many pacthes we will get
         self.vision_config.projection_dim = projection_dim
 
 
@@ -80,6 +114,24 @@ class PaliGemmaForConditionalGeneration(nn.Module):
         This reduces model size by ~20-25% and often improves performance through better regularization and more efficient learning."""
         return self.language_model.tie_weights()
 
+
+
+    def _merge_input_ids_with_image_features(
+              self, 
+              image_features: torch.Tensor,
+              input_embeds: torch.Tensor,
+              input_ids: torch.Tensor,
+              attention_mask: torch.Tensor,
+              kv_cache: Optional[KVCache] =None
+
+        ):
+            # extract info from input
+            _, _, embed_dim =image_features.shape
+            batch_size, sequence_length = input_ids.shape  #[0] : I love you => 12 15 19 (tokenized)(batch:1, seq_len: 3)
+            dtype, device = input_embeds.dtype, input_embeds.device
+
+            #shape:[batch_size, seq_len, hidden_size]
+            scaled_image_features = image_features / (self.config.hidden_size**0.5) # equivalent to 1/sqrt(head_dim) # same kind of scaling that we usein attention mechanism
 
     def forward(self,
                 input_ids: torch.LongTensor = None,
