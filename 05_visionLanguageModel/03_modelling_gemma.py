@@ -52,8 +52,8 @@ class PaliGemmaConfig():
             self,
             vision_config = None,# vision encoder config
             text_config = None, # gemma config..lang_model
-            ignore_index = -100,
-            image_token_index = 256000, #<image> id
+            ignore_index = -100, # for labels while training
+            image_token_index = 256000, #<image> id # imag placeholder token_id 
             vocab_size = 257152,
             projection_dim = 2048, # dim visoin encoder output should be resized to (linear Projection layer output size)
             hidden_size = 2048, # language model embedding size
@@ -132,6 +132,54 @@ class PaliGemmaForConditionalGeneration(nn.Module):
 
             #shape:[batch_size, seq_len, hidden_size]
             scaled_image_features = image_features / (self.config.hidden_size**0.5) # equivalent to 1/sqrt(head_dim) # same kind of scaling that we usein attention mechanism
+
+            # combine the embeddings of the image tokens, the next tokens, and mask out all the padding tokens.
+            final_embedding = torch.zeros(batch_size, sequence_length, embed_dim, dtype=input_embeds.dtype, device=input_embeds.device)
+
+            #creating masks
+            #shape: [batch, seq_len]
+            
+            # true foe text tokens
+            text_mask = (input_ids != self.config.image_token_index) & (input_ids !=self.pad_token_id)
+            #true for image tokens  # imahe placeholder tokens
+            image_mask = input_ids == self.config.image_token_index
+            # true for padding tokens
+            pad_mask = input_ids == self.pad_token_id
+            
+            # so we will place image token, text token and padding token in this final_embedding based on these masks
+
+
+            # we need to expand the masks to the embedding dimension otherwise we can't  use them in torch.where
+            #[batch, seq_len] -> [batch, seq_len, embed_dim]
+            text_mask_expanded = text_mask.unsqueeze(-1).expand(-1, -1, embed_dim) # -1 mean dont leep this dim same
+            pad_mask_expanded = pad_mask.unsqueeze(-1).expand(-1, -1, embed_dim) # -1 mean dont leep this dim same
+            image_mask_expanded = image_mask.unsqueeze(-1).expand(-1, -1, embed_dim) # -1 mean dont leep this dim same
+
+
+            # conirming no mask overlap
+            assert not (text_mask & image_mask).any(), "Overlap detected between text and image masks."
+            assert not (text_mask & pad_mask).any(), "Overlap detected between text and pad masks."
+            assert not (image_mask & pad_mask).any(), "Overlap detected between image and pad masks."
+
+
+            # [batch, seq_len, embed_dim]
+            # first add text_embeddings
+            final_embedding = torch.where(text_mask_expanded, input_embeds, final_embedding)
+
+            # insert image embeddings
+            # we can't use torch.where because the sequence length of scaled_image_features is not equal to equal to the dequnce length  of final embedding.
+            final_embedding = final_embedding.masked_scatter(image_mask_expanded, scaled_image_features)  # place where we have placeholder token if for <image>
+
+            # insert padding
+            final_embedding = torch.where(pad_mask_expanded, torch.zeros_like(final_embedding), final_embedding)
+
+
+            # so noew we have [256 image tokenn embefdings +<text embeddng>]
+
+
+
+            # attention mask will be created based on how we are wokring with KV-Cache
+
 
     def forward(self,
                 input_ids: torch.LongTensor = None,
