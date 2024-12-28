@@ -177,8 +177,37 @@ class PaliGemmaForConditionalGeneration(nn.Module):
             # so noew we have [256 image tokenn embefdings +<text embeddng>]
 
 
+            ## CREATING ATTENTION MASK
 
             # attention mask will be created based on how we are wokring with KV-Cache
+            
+            dtype, device = input_embeds.dtype, input_embeds.device
+            min_dtype = torch.finfo(dtype=dtype)
+            q_len = input_embeds.shape[1]
+
+
+            if kv_cache is None or kv_cache.num_items() == 0:
+                # Do not mask any token, becasue we are in prefill phase
+                # this only works when you haveno padding
+                causal_mask = torch.full(
+                     (batch_size, q_len, q_len),
+                     fill_value=0,
+                     dtype=dtype,
+                     device=device
+                )
+            else:   
+                # since we are genreating tokens, the query must be one single token
+                assert q_len == 1
+
+                kv_len = kv_cache.num_items() + q_len
+                # also in this case we dont need to mask anything, since each query should be able to attend all previous
+                # this only works when we have no padding
+                causal_mask = torch.full(
+                     (batch_size, q_len, kv_len),
+                     fill_value= 0,
+                     dtype=dtype,
+                     device=device
+                )
 
 
     def forward(self,
