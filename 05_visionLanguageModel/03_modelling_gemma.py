@@ -192,13 +192,14 @@ class PaliGemmaForConditionalGeneration(nn.Module):
                 # this only works when you haveno padding
                 causal_mask = torch.full(
                      (batch_size, q_len, q_len),
-                     fill_value=0,
+                     fill_value=0, # mask is made up of -inf for all the positions for whoch we dont want interactions..but here we are not using -inf
                      dtype=dtype,
                      device=device
-                )
+                ) 
+
             else:   
                 # 2. TOKEN GENERATION
-                # since we are genreating tokens, the query must be one single token
+                # since we are genreating tokens, the query must be one single token so q_len must be 1
                 assert q_len == 1
 
                 kv_len = kv_cache.num_items() + q_len
@@ -210,6 +211,10 @@ class PaliGemmaForConditionalGeneration(nn.Module):
                      dtype=dtype,
                      device=device
                 )
+
+            # add the head dimebsion
+            # [batch_size, q_len, kv_len] -> [batch_size, num_head_Q, Q_len, kv_len]
+            causal_mask = causal_mask.unsqueeze(1) # mask is made up of -inf for all the positions for whoch we dont want interactions
 
 
     def forward(self,
