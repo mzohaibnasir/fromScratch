@@ -200,9 +200,9 @@ class PaliGemmaForConditionalGeneration(nn.Module):
             else:   
                 # 2. TOKEN GENERATION
                 # since we are genreating tokens, the query must be one single token so q_len must be 1
-                assert q_len == 1
+                assert q_len == 1# generating one token at a time
 
-                kv_len = kv_cache.num_items() + q_len
+                kv_len = kv_cache.num_items() + q_len # adding current query token
                 # also in this case we dont need to mask anything, since each query should be able to attend all previous
                 # this only works when we have no padding
                 causal_mask = torch.full(
@@ -215,6 +215,29 @@ class PaliGemmaForConditionalGeneration(nn.Module):
             # add the head dimebsion
             # [batch_size, q_len, kv_len] -> [batch_size, num_head_Q, Q_len, kv_len]
             causal_mask = causal_mask.unsqueeze(1) # causal  mask is made up of -inf for all the positions for whoch we dont want interactions
+
+
+
+
+            # kvcache coded
+
+
+
+            # rotary position encodings
+            # positions of tokens that would be used by rotary position encodings
+
+
+            if kv_cache is not None and kv_cache.num_items() >0:
+                 # the position of qurey is just the last position
+                 position_ids = attention_mask.cumsum(-1)[:,-1]
+                 if position_ids.dim() == 1:
+                      position_ids = position_ids.unsqueeze(0)
+            else:
+                 # create a position_ids baed on current  size of attention_mask
+                 # for masked tokens, use number 1 as position.
+
+
+                 position_ids = (attention_mask.cumsum(-1)).masked_fill((attention_mask==0), 1).to(device=device)
 
 
     def forward(self,
