@@ -187,6 +187,7 @@ class PaliGemmaForConditionalGeneration(nn.Module):
 
 
             if kv_cache is None or kv_cache.num_items() == 0:
+                # 1. PREFILLING
                 # Do not mask any token, becasue we are in prefill phase
                 # this only works when you haveno padding
                 causal_mask = torch.full(
@@ -196,6 +197,7 @@ class PaliGemmaForConditionalGeneration(nn.Module):
                      device=device
                 )
             else:   
+                # 2. TOKEN GENERATION
                 # since we are genreating tokens, the query must be one single token
                 assert q_len == 1
 
