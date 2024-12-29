@@ -214,7 +214,7 @@ class PaliGemmaForConditionalGeneration(nn.Module):
 
             # add the head dimebsion
             # [batch_size, q_len, kv_len] -> [batch_size, num_head_Q, Q_len, kv_len]
-            causal_mask = causal_mask.unsqueeze(1) # mask is made up of -inf for all the positions for whoch we dont want interactions
+            causal_mask = causal_mask.unsqueeze(1) # causal  mask is made up of -inf for all the positions for whoch we dont want interactions
 
 
     def forward(self,
