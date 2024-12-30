@@ -82,9 +82,45 @@ class PaliGemmaConfig():
 
 
         
+class PaliGemmaMultiModalProjector(nn.Module):
+    """converts hidden size of vision model to into projection dimension which is embedding size of text model"""
+    def __init__(self, config: PaliGemmaConfig):
+         super().__init__()
+         self.linear = nn.Linear(
+              config.vision_config.hidden_size,
+              config.vision_config.projection_dim,
+              bias=True
+         )
+    def forward(self, image_features):
+        # [batch_size, num_patches, embed_dim] => [batch_size, num_patches, projection_dim]
+        hidden_state = self.linear(image_features)
+        return hidden_state
 
 # first create structure if model than compoentns
+class GemmaForCausalLM(nn.Module):
+    """xxCausalLM always means it is transformer model with language modeling head i.e. self.lm_head"""
+    def __init__(self, config):
+          super().__init__()
+          self.config = config
+          self.model = GemmaModel(config)
+          self.vocab_size = config.vocab_size
+          self.lm_head = nn.Linear(
+               config.hidden_size,
+               config.vocab_size,
+               bias = False
+          )
 
+    def get_input_embeddings(self):
+        return self.model.embed_tokens
+    
+    def tie_weights(self):
+        """
+        sharing weights aming embedding layer and logits layer"""
+        self.lm_head.weight = self.model.embed_tokens.weight
+    
+    
+    def forward(self,
+                attention_mask: Optional[torch.Tensor])
 
 
 class PaliGemmaForConditionalGeneration(nn.Module):
@@ -178,6 +214,7 @@ class PaliGemmaForConditionalGeneration(nn.Module):
 
 
             ## CREATING ATTENTION MASK
+            # BLOCK attention throughout image and prefix  and AUTOREGRESSIVE attention on the suffix
 
             # attention mask will be created based on how we are wokring with KV-Cache
             
@@ -224,20 +261,31 @@ class PaliGemmaForConditionalGeneration(nn.Module):
 
 
             # rotary position encodings
-            # positions of tokens that would be used by rotary position encodings
+            # we need the positions of tokens that would be used by rotary position encodings
 
 
-            if kv_cache is not None and kv_cache.num_items() >0:
+            if kv_cache is not None and kv_cache.num_items() >0: 
+                 #prefilling
                  # the position of qurey is just the last position
-                 position_ids = attention_mask.cumsum(-1)[:,-1]
+                 # this will be used to assess which rotary positional encdogin we are going to apply to each token
+                 position_ids = attention_mask.cumsum(-1)[:,-1]# it should be equal to number of tokens in prompt.. as there are only 1s in attention_mask and no padding tokens so we can directly use them
                  if position_ids.dim() == 1:
                       position_ids = position_ids.unsqueeze(0)
             else:
+                 # token generation: now wehave one single query to apply positional encoding and for that we only take one token
                  # create a position_ids baed on current  size of attention_mask
                  # for masked tokens, use number 1 as position.
 
 
-                 position_ids = (attention_mask.cumsum(-1)).masked_fill((attention_mask==0), 1).to(device=device)
+                 # when we generate tokens, basically we have some tokens akready in kv_cache and then we have one new token which  is last predict token
+                 # which we use as a query. To  understand what is position of this token, we also provide attention mask. Attention mask indicates 
+                 # that it's all made up of 1s. how many 1s? tokens in kv_caache :n+ new token :1...noew token that we need to add to kvacache before we calculate attention
+                 #  ..so here attention_mask.cumsum(-1) we are counting tokens in kva_cache
+
+
+                 position_ids = (attention_mask.cumsum(-1)).masked_fill((attention_mask==0), 1).to(device=device) # 
+
+            return final_embedding, causal_mask, position_ids
 
 
     def forward(self,
