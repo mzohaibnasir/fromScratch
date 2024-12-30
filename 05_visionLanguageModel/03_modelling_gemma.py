@@ -96,6 +96,150 @@ class PaliGemmaMultiModalProjector(nn.Module):
         hidden_state = self.linear(image_features)
         return hidden_state
 
+
+
+
+class GemmaRMSNorm(nn.Module):
+    def __init__(
+            self,
+            dim:int, 
+            eps:float= 1e-6
+    ):
+        super().__init__()
+        self.eps = eps  # as we are multiplying by 1/sqrt(..), if ,so if (sqrt(...)) is too small, it would give really big number.. we avoid this  using eps
+        self.weight == nn.Parameter(torch.zeros(dim)) # this is that gamma(learnable paramter) # number of parameters, one for each fature
+    
+    def _norm(self, x):
+        return x* torch.rsqrt(
+            x.pow(2).mean(-1, keepdim=True) + self.eps # 1/sqrt(...)
+        )
+
+    def forward(self, x):
+        output = self._norm(x.float())
+        output = output * (1.0 + self.weight.float())
+        return output.type_as(x)
+
+
+
+
+# same as silip
+class GemmaDecoderLayer(nn.Module):
+    def __init__(self, 
+                 config: GemmaConfig,
+                 layer_idx: int
+                 ):
+    
+        super().__init__()
+        self.hidden_size = config.hidden_size
+        self.self_attn = GemmaAttention(
+            config=config,
+            layer_idx=layer_idx
+        )
+        self.mlp = GemmaMLP(config) # FFN
+        self.input_layernorm = GemmaRMSNorm(
+            config.hidden_size,
+            eps = config.rms_norm_eps   
+        )
+        self.input_post_attention_layernorm = GemmaRMSNorm(
+            config.hidden_size,
+            eps = config.rms_norm_eps   
+        )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class GemmaModel(nn.Module):
+
+    """
+        Language model is an embeddings layer, series of transfomer layers and then the lamguage  modelling head.
+        #LM_head is already implemented in GemmaForCausalLM
+    """
+    def __init__(self, config):
+        super().__init__()
+        self.config  = config
+        self.padding_idx = config.pad_token_id
+        self.vocab_size = config.vocab_size
+
+
+        self.embed_tokens = nn.Embedding(
+             config.vocab_size,
+             config.hidden_size,
+             self.padding_idx
+        )
+
+        self.layers = nn.ModuleList(
+             [GemmaDecoderLayer( config, layer_idx ) for layer_idx in range(config.num_hidden_layers)]
+        )
+
+        self.norm = GemmaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+
+
+    def get_input_embeddings(self):
+        return self.embed_tokens # to extract initial embeddings
+
+
+    def forward(
+              self,
+              attention_masks: Optional[torch.Tensor] = None,
+              position_ids: Optional[torch.LongTensor] = None, #  used to apply rotary positional embeddings.. here positional embeddings are applied just before applying attention .. unlike vanilla transformer
+              input_embeds: Optional[torch.FloatTensor] = None,
+              kv_cache: Optional[KVCache] = None
+              )-> torch.FloatTensor:
+        # [ batch_size, seq_len, hidden_size]
+        hidden_states =input_embeds
+
+        # [ batch_size, seq_len, hidden_size]
+        normalizer = torch.tensor(
+        self.config_hidden_size **0.5, dtype=hidden_states.dtype
+        )
+        
+        hidden_states = hidden_states* normalizer
+
+
+        for decoder_layer in self.layers:
+            #[batch_size, seq_len, hidden_size]
+            hidden_states = decoder_layer(
+                hidden_states=hidden_states,
+                attention_masks=attention_masks,
+                position_ids=position_ids,  
+                kv_cache=kv_cache
+            )
+
+        # [batch_size, seq_len, hidden_size]            
+        hidden_states  = self.norm(hidden_states)
+
+        # [batch_size, seq_len, hidden_size]
+        return hidden_states
+
+
+
+
+
+
+
+
+
+
+
 # first create structure if model than compoentns
 class GemmaForCausalLM(nn.Module):
     """xxCausalLM always means it is transformer model with language modeling head i.e. self.lm_head"""
@@ -119,9 +263,41 @@ class GemmaForCausalLM(nn.Module):
         self.lm_head.weight = self.model.embed_tokens.weight
     
     
-    def forward(self,
-                attention_mask: Optional[torch.Tensor])
+    def forward(
+            self,
+            attention_mask: Optional[torch.Tensor]= None,
+            position_ids : Optional[torch.LongTensor] = None,
+            inputs_embeds : Optional[torch.FloatTensor] =  None,
+            kv_cache : Optional[KVCache] = None,
+    ):
+        # input_embds: [batch_size, seq_len, hidden_size]
+        # outputs: [batch_size, seq_len, hidden_size]
 
+    
+        # send to model and outputs will be embeddings
+        outputs = self.model(
+              attention_mask = attention_mask,
+              position_ids = position_ids,
+              inputs_embeds = inputs_embeds,
+              kv_cache = kv_cache   
+         )
+
+
+        # but we do not want embeddings, we want LOGITS
+        hidden_state = outputs
+        logits = self.lm_head(hidden_state)
+        logits = logits.float()
+
+        return_data = {
+             "logits":logits
+        }
+
+        # if user specified kv_cahe, we retunrthat too
+
+        if kv_cache is not None:
+            # return the updated cache
+            return_data['kv_cache'] = kv_cache
+        return return_data
 
 class PaliGemmaForConditionalGeneration(nn.Module):
     """
