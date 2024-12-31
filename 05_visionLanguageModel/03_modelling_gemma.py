@@ -120,6 +120,91 @@ class GemmaRMSNorm(nn.Module):
         return output.type_as(x)
 
 
+class GemmaMLP(nn.Module):
+    """
+    gated projections, adds more leaenable parameters........ also used in llama
+    to add non linearity and trainable parameters
+    first layer expands and then reduces dims gives oppotunity to learn complex features
+    """
+
+
+    def __init__(self, config):
+        super().__init__())
+
+        self.config = config
+        self.hidden_size = config.hidden_size
+        self.intermediate_size = config.intermediate_size
+        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False) # this is  used foe activation function that gemma is using
+        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
+        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=False)
+
+
+    def forward(self, x):
+        # # equivalen to 
+        # #[batch_size, seq_len, hidden_size] -> [ batch_size, seq_len. intermediate_size]
+        # y = self.gate_proj(x)
+        # # [batch_size. seq_len, intermediate_size]
+        # y = torch.gelu(y, approximate='tanh')
+
+
+        # # [batch_size, seq_len, hidden_size] -> [batch_size, seq_len, intermediate_size]
+        # j = self.up_proj(x)
+        
+        # # [batch_size, seq_len, intermediate_size]
+        # z= y* j 
+
+        # # [batch_size, seq_len. intermediate_size]-> [batch_size, seq_len, hidden_size]
+        # z= self.down_proj(z)
+
+
+        return self.down_proj(
+            nn.functional.gelu(self.gate_proj(x), approximate='tanh')
+            *
+            self.up_proj(x)
+        )
+    
+
+
+
+
+class GemmaAttention(nn.Module):
+
+    def __init__(self,
+                 config: GemmaConfig,
+                 layer_idx: Optional[int] =  None
+                 ):
+
+                 super().__init__()
+                 self.config = config
+                 self.layer_idx = layer_idx
+
+                 self.attention_dropout = config.attention_dropout
+                 self.hidden_size = config.hidden_size
+                 self.num_heads = config.num_attention_heads
+                 self.head_dim = config.head_dim # num of attention heads for query
+                 self.num_key_value_heads = config.num_attention_heads
+                 self.num_key_value_groups = self.num_heads // self.num_key_value_heads
+                 self.max_position_embeddings = config.max_position_embeddings
+                 self.rope_theta = config.rope_theta
+                 self.is_causal = True
+
+                 assert self.hidden_size % self.num_heads ==0 
+                 
+
+                 # In group query attention: numbers of heads in query are more than k and v heads
+                 # num_heads = 8
+                 # hidden_size = 1024
+                 # hed_dim = hidden_size//num_heads = 128
+                 # Wq: [1024, 8*128]  = [1024, 1024]
+                 # Wk: [1024, 1*128] = [1024, 128]
+                 # Wv: [1024, 1*128] = [1024, 128]
+                 # Wo:[1024, 1024]
+                 self.q_proj = nn.Linear(self.hidden_size, self.num_heads*self.head_dim, bias=config.attention_bias)
+                 self.k_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=config.attention_bias)
+                 self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=config.attention_bias)
+                 self.o_proj = nn.Linear(self.num_heads * self.head_dim, self.num_key_value_heads * self.hidden_size, bias=config.attention_bias)
+
+
 
 
 # same as silip
@@ -140,12 +225,47 @@ class GemmaDecoderLayer(nn.Module):
             config.hidden_size,
             eps = config.rms_norm_eps   
         )
-        self.input_post_attention_layernorm = GemmaRMSNorm(
+        self.post_attention_layernorm = GemmaRMSNorm(
             config.hidden_size,
             eps = config.rms_norm_eps   
         )
 
+    def forward(
+            self,
+             hidden_states: torch.Tensor, 
+             attention_mask: Optional[torch.Tensor]= None,
+             position_ids: Optional[torch.LongTensor]= None,
+             kv_cache : Optional[KVCache] = None
+    ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+        residual = hidden_states
 
+        #[batch_size, sql_len,  hidden_Size]
+        hidden_states = self.input_layernorm(hidden_states)
+
+        #[batch_size, sql_len,  hidden_Size]
+        hidden_states, _ , = self.self_attn(
+            hidden_states = hidden_states,
+            attention_mask = attention_mask,
+            position_ids = position_ids,
+            kv_cache = kv_cache
+        )
+
+        #[batch_size, sql_len,  hidden_Size]
+        hidden_states = hidden_states + residual
+
+        
+        #[batch_size, sql_len,  hidden_Size]
+        hidden_states = self.post_attention_layernorm(hidden_states)
+
+
+        #[batch_size, sql_len,  hidden_Size]
+        hidden_states = self.mlp(hidden_states)
+
+
+        #[batch_size, sql_len,  hidden_Size]
+        hidden_states = residual + hidden_states
+
+        return hidden_states
 
 
 

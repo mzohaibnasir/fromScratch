@@ -93,6 +93,7 @@ class SiglipVisionEmbeddings(nn.Module):
 class SiglipMLP(nn.Module):
     """
     to add non linearity and trainable parameters
+    first layer expands and then reduces dims to learn complex features
     """
 
     def __init__(self, config: SiglipVisionConfig):
