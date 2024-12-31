@@ -363,8 +363,8 @@ class PaliGemmaForConditionalGeneration(nn.Module):
 
             # we need to expand the masks to the embedding dimension otherwise we can't  use them in torch.where
             #[batch, seq_len] -> [batch, seq_len, embed_dim]
-            text_mask_expanded = text_mask.unsqueeze(-1).expand(-1, -1, embed_dim) # -1 mean dont leep this dim same
-            pad_mask_expanded = pad_mask.unsqueeze(-1).expand(-1, -1, embed_dim) # -1 mean dont leep this dim same
+            text_mask_expanded = text_mask.unsqueeze(-1).expand(-1, -1, embed_dim) # -1 mean dont keep this dim same
+            pad_mask_expanded = pad_mask.unsqueeze(-1).expand(-1, -1, embed_dim) # -1 mean dont keep this dim same
             image_mask_expanded = image_mask.unsqueeze(-1).expand(-1, -1, embed_dim) # -1 mean dont leep this dim same
 
 
