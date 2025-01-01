@@ -11,6 +11,11 @@ from torch.nn import CrossEntropyLoss
 import math
 from 01_modelling_siglip import SiglipVisionConfig, SiglipVisionModel
 
+
+
+
+
+
 class KVCache():
     def __init__(self) -> None:
         self.key_cache=[]
@@ -23,15 +28,34 @@ class KVCache():
             # rember we are adding key_states and value_states to key_cache and value_cache
             # which are of the shape [batch_size, num_heads_kv seq_len, head_dim]
             # so we would be returing seq_len currently stored in kv_cache
+
+            # For each token: 
+            # Keys and values are appended to the KV cache along the sequence length dimension.
+            # At each decoding step, the KV cache grows by one entry along the sequence length dimension.
             return self.key_cache[0].shape[-2]
 
     def update(self, 
                key_states : torch.Tensor,
-               values_states : torch.Tensor,
+               values_states : torch.Tensor, 
                layer_idx: int,
                )-> Tuple[torch.Tensor, torch.Tensor]:
+        if len(self.key_cache) <= layer_idx:
+            # if we never added anything to the KV-Cache of this layer, let's craetea it
+            self.key_cache.append(key_states)
+            self.value_cache.append(values_states)
+        else:
+            # ... otherwise we concatenate the new keys with the existing ones.
+            # each tensor has shape: [batch_size, num_heads_kv, seq_len, head_dim]
 
-               if len
+            self.key_cache[layer_idx] = torch.cat(
+                    [self.key_cache[layer_idx], key_states], dim =-2
+                                                            )
+            self.value_cache[layer_idx] = torch.cat(
+                    [self.value_cache[layer_idx], values_states], dim =-2
+                                                        )
+        # ... and then we return all the existing keys  + new ones
+        return self.key_cache[layer_idx], self.value_cache[layer_idx]
+            
 
 
 
