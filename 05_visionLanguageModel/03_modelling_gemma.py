@@ -11,6 +11,32 @@ from torch.nn import CrossEntropyLoss
 import math
 from 01_modelling_siglip import SiglipVisionConfig, SiglipVisionModel
 
+class KVCache():
+    def __init__(self) -> None:
+        self.key_cache=[]
+        self.value_cache=[]
+        
+    def num_items(self)-> int:
+        if len(self.key_cache) == 0:
+            return 0
+        else:
+            # rember we are adding key_states and value_states to key_cache and value_cache
+            # which are of the shape [batch_size, num_heads_kv seq_len, head_dim]
+            # so we would be returing seq_len currently stored in kv_cache
+            return self.key_cache[0].shape[-2]
+
+    def update(self, 
+               key_states : torch.Tensor,
+               values_states : torch.Tensor,
+               layer_idx: int,
+               )-> Tuple[torch.Tensor, torch.Tensor]:
+
+               if len
+
+
+
+
+
 class GemmaConfig():
     def __init__(
             self,
@@ -192,7 +218,7 @@ class GemmaAttention(nn.Module):
                  
 
                  # In group query attention: numbers of heads in query are more than k and v heads
-                 # num_heads = 8
+                # num_heads = 8
                  # hidden_size = 1024
                  # hed_dim = hidden_size//num_heads = 128
                  # Wq: [1024, 8*128]  = [1024, 1024]
@@ -204,7 +230,65 @@ class GemmaAttention(nn.Module):
                  self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=config.attention_bias)
                  self.o_proj = nn.Linear(self.num_heads * self.head_dim, self.num_key_value_heads * self.hidden_size, bias=config.attention_bias)
 
+                 # rotary position encoding
+                 self.rotary_embed = GemmaRotaryEmbedding(
+                      self.head_dim,
+                      max_position_embeddings = self.max_position_embeddings,
+                      base = self.rope_theta
+                 )
 
+
+    def forward(self, 
+                hidden_states: torch.Tensor,
+                attention_mask: Optional[torch.Tensor] = None,
+                position_ids: Optional[torch.LongTensor] = None,
+                kv_cache: Optional[KVCache] = None,
+                **kwargs,
+                ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
+                
+                # [batch_size, seq_len, hidden_size]
+                bsz, q_len, _ = hidden_states.size()
+
+                #[batch_size, seq_len, num_heads_q * head_dim]
+                query_states = self.q_proj(hidden_states)
+
+                
+                #[batch_size, seq_len, num_heads_kv * head_dim]
+
+                key_states = self.k_proj(hidden_states)
+                value_states = self.v_proj(hidden_states)
+
+                # [batch_size, num_heads_Q, seq_len, head_dim]
+                query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1,2)
+
+                # [batch_size, num_heads_KV, seq_len, head_dim]
+                key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1,2)
+                value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1,2)
+
+
+                # apply roatary position encoding
+                # we are just modifying these embeddings by adding some positional information
+                #[batch_size, seq_len, heqd_dim] -> [batch_size, seq_len, head_dim]
+                cos, sin = self.rotary_emb(value_states, position_ids, seq_len=None)
+                
+                #[batch_size, num_heads_q, seq_len, head_dim] -> [batch_size, num_head_kv, seq_len, head_dim]
+                query_states, key_states = self.apply_rotary_pos_emb(query_states, key_states, cos, sin)
+
+
+                # when woring with kv_cache , we only pass one token as input to the transormer layers and then this single otken is added to kv_cache of this particular laye 
+                # and then we retrieve the content of this kv_cache whoch also includesthe current token an dthen we use this kv_cahe to compute attention
+
+                if kv_cache is not None:
+                    key_states, value_states = kv_cache.update(
+                         key_states, # token we are adding to key_cache
+                         value_states, # token we are adding to value_kache
+                         self.layer_idx
+                    )
+                
+
+
+
+                
 
 
 # same as silip
