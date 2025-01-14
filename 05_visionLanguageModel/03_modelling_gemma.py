@@ -34,6 +34,7 @@ class KVCache():
             # At each decoding step, the KV cache grows by one entry along the sequence length dimension.
             return self.key_cache[0].shape[-2]
 
+
     def update(self, 
                key_states : torch.Tensor,
                values_states : torch.Tensor, 
@@ -148,6 +149,29 @@ class PaliGemmaMultiModalProjector(nn.Module):
 
 
 
+class GemmaRotaryEmbedding(nn.Module):
+    def __init__(self,
+                 dim, 
+                 max_position_embeddings=2048, # max number of positions we can encode
+                 base=10000,
+                 device=None):
+        super().__init__()
+
+        self.dim = dim # it is set to head_dim # as rope mpodify attention mechansim and attention mechansim is performed independently for each heaad so each head will hav eits own postional encoding applied to.
+        self.max_position_embeddings =  max_position_embeddings
+        self.base = base
+
+
+        # calculate  the theta according to  the formula theta_i =base^(2i/dim) where i =0,1,....., dim//2
+        inv_freq = 1.0/(self.base ** (torch.arange(0, self.dim, 2, dtype=torch.int64).float()/ self.dim))
+        self.register_buffer(
+             "inv_freq",
+             tensor= = inv_freq,
+             persistent=False
+        )
+
+
+
 
 class GemmaRMSNorm(nn.Module):
     def __init__(
@@ -213,6 +237,16 @@ class GemmaMLP(nn.Module):
             self.up_proj(x)
         )
     
+
+def repeat_kv(
+          hidden_states: torch.Tensor,
+          n_rep:int
+    )-> torch.Tensor:
+    batch, num_key_value_heads, slen, head_dim = hidden_states.shape
+    if n_rep ==1:
+         return hidden_states
+    hidden_states = hidden_states[:,:,None,:,:].expand(batch,num_key_value_heads,n_rep, slen,head_dim)
+    return hidden_states.reshape(batch, num_key_value_heads*n_rep, slen, head_dim)
 
 
 
@@ -303,11 +337,61 @@ class GemmaAttention(nn.Module):
                 # and then we retrieve the content of this kv_cache whoch also includesthe current token an dthen we use this kv_cahe to compute attention
 
                 if kv_cache is not None:
+                    # for prefilling, all keys and value will go in at once but for inference one at a time
                     key_states, value_states = kv_cache.update(
                          key_states, # token we are adding to key_cache
                          value_states, # token we are adding to value_kache
                          self.layer_idx
                     )
+
+                # repeat the key and values to match  the number of heads and query
+                # not actually using GQA i.e. head_q = head_kv
+                key_states = repeat_kv(key_states, self.num_key_value_groups)
+                value_states = repeat_kv(value_states, self.num_key_value_groups)
+
+                # head_q ==head_v ==head_k
+
+
+                # perform the calculation as usual, Q* K^T /sqer(head_dim). shape :[batch_size, num_heads_q, seq_len_q, seq_len_kv]
+                attn_weights = torch.matmul(query_states, key_states.transpose(-2,-1)) / math.sqrt(self.head_dim)
+
+                assert attention_mask is not None, "Attention mask is required"
+
+                attn_weights = attn_weights + attention_mask  # here attn amasks will be all 0s as we dont have paddings and we are not masking anything in prfeilling  as input prompt also attends future tokens
+
+
+                # apply the softmax
+                # [batch_size, num_heads_q, seq_len_q, seq_len_kv] # row by row
+                attn_weights = nn.functional.softmax(attn_weights,dim=-1, dtype=torch.float32).to(query_states.dtype)
+
+                # add dropout
+                attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
+
+                # multiply by V. [batch_size, num_heads_q, seq_len_q, seq_len_kv] *[batch_size, num_heads_kv, seq_len_kv, head_dim] -> [batch_size, num_heads_q, seq_len_q, head_dim]
+                attn_output = torch.matmul(attn_weights, value_states) # weighted sum: each token is aggregation of all the previous tokens based on the score defined by attention matrix
+                 
+                if attn_output.size() != (bsz, self.num_heads, q_len, self.head_dim):
+                    raise ValueError(
+                        f"Attention output size {attn_output.size()} does not match {(bsz, self.num_heads, q_len, self.head_dim)}"
+                    )
+
+                # [batch_size, num_head_q, seq_len_q, head_dim] -> [batch_size, seq_len_q, num_heads_q, head_dim]
+                attn_output = attn_output.transpose(1,2).contiguous()
+
+                # [batch_size, num_head_q, seq_len_q, head_dim] -> [batch_size, seq_len_q, num_heads_q * head_dim]
+                attn_output = attn_output.view(bsz, q_len, -1 )
+
+                # Multiply by Wo, [batch_size, seq_len_q, hidden_size   ]
+                attn_output =self.o_proj(attn_output)
+
+
+                return attn_output, attn_weights
+
+
+
+
+
+
                 
 
 
