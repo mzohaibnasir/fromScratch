@@ -1,0 +1,151 @@
+𝗠𝗟 𝗙𝘂𝗻𝗱𝗮𝗺𝗲𝗻𝘁𝗮𝗹𝘀
+↳ Variance-Bias Trade-off
+↳ Regression Algorithms (e.g. Linear, Polynomial)
+↳ Classification Algorithms (e.g. GBM)
+↳ Clustering Algorithms
+↳ Deep Learning (e.g. DNN, LSTM, Transformers)
+↳ Reinforcement Learning
+↳ Model Evaluation Metrics (Precision, Recall, AUC-ROC)
+↳ Handling Missing Data
+↳ Feature Scaling (Normalization, Standardization)
+↳ Feature Selection Techniques
+↳ Dimensionality Reduction (PCA, t-SNE)
+↳ Encoding Categorical Data
+↳ Hyperparameter Tuning
+↳ Cross-Validation Techniques
+↳ Regularization Methods (L1, L2)
+
+𝗖𝗼𝗱𝗶𝗻𝗴
+↳ Python for ML
+↳ Writing Efficient Code
+↳ Data Structures and Algorithms
+↳ Implementing ML Algorithms from Scratch
+↳ Working with ML Libraries (scikit-learn, PyTorch)
+
+𝗦𝘆𝘀𝘁𝗲𝗺 𝗗𝗲𝘀𝗶𝗴𝗻
+↳ Data Ingestion and Preprocessing
+↳ ETL/ELT Processes
+↳ Handling Big Data (Hadoop, Spark)
+↳ Kafka for streaming
+↳ Caching
+↳ SQL vs noSQL
+↳ Load Balancing
+↳ Edge Deploymebt
+
+𝗠𝗟 𝗦𝘆𝘀𝘁𝗲𝗺 𝗗𝗲𝘀𝗶𝗴𝗻
+↳ Design Recommender System
+↳ Fraud Detection System
+↳ Real-Time Bidding
+↳ Chatbot Architecture
+↳ Sentiment Analysis Pipeline
+↳ Image Classification System
+↳ Voice Recognition System
+
+𝗠𝗟 𝗗𝗲𝗽𝗹𝗼𝘆𝗺𝗲𝗻𝘁
+↳ Model Serving (Batch, Real-Time)
+↳ Monitoring and Maintaining Models in Production
+↳ Model Retraining Strategies
+↳ Workflow Orchestration (Airflow, Kubeflow)
+↳ Experiment Tracking (MLflow)
+↳ Model Registry and Versioning
+
+
+
+
+
+
+---
+
+### **1. Core Machine Learning Concepts**
+1.1. Types of Machine Learning (Supervised, Unsupervised, Reinforcement Learning)  
+1.2. Feature Engineering and Feature Selection  
+1.3. Model Evaluation Metrics (Accuracy, Precision, Recall, F1, ROC-AUC, etc.)  
+1.4. Overfitting and Underfitting (Bias-Variance Tradeoff)  
+1.5. Hyperparameter Tuning (Grid Search, Random Search, Bayesian Optimization)  
+1.6. Ensemble Methods (Bagging, Boosting, Stacking)  
+1.7. Transfer Learning and Pretrained Models  
+
+---
+
+### **2. Deep Learning**
+2.1. Neural Network Architectures (CNNs, RNNs, LSTMs, Transformers)  
+2.2. Activation Functions and Loss Functions  
+2.3. Optimization Techniques (SGD, Adam, RMSprop)  
+2.4. Regularization Techniques (Dropout, Batch Normalization, Weight Decay)  
+2.5. Attention Mechanisms (Self-Attention, Multi-Head Attention)  
+2.6. Sequence-to-Sequence Models (Encoder-Decoder Architecture)  
+2.7. GANs and Variational Autoencoders  
+
+---
+
+### **3. Data Engineering for ML**
+3.1. Data Preprocessing and Cleaning  
+3.2. Data Pipelines (ETL Processes)  
+3.3. Big Data Tools (Hadoop, Spark, Kafka)  
+3.4. Database Systems (SQL and NoSQL)  
+3.5. Feature Stores and Data Versioning  
+
+---
+
+### **4. MLOps and Deployment**
+4.1. Model Serving (FastAPI, Flask, TensorFlow Serving, TorchServe)  
+4.2. CI/CD Pipelines for ML (GitHub Actions, Jenkins, Kubeflow Pipelines)  
+4.3. Containerization (Docker, Kubernetes)  
+4.4. Monitoring and Logging (Prometheus, Grafana, MLFlow)  
+4.5. A/B Testing and Canary Deployments  
+4.6. Cloud Platforms (AWS, GCP, Azure)  
+
+---
+
+### **5. System Design for ML**
+5.1. Designing Scalable ML Systems  
+5.2. Real-Time vs Batch Inference Systems  
+5.3. Data Storage and Retrieval for Large Datasets  
+5.4. Distributed Training and Model Parallelism  
+5.5. Latency and Throughput Optimization  
+
+---
+
+### **6. Algorithms and Data Structures**
+6.1. Arrays, Linked Lists, Trees, Graphs  
+6.2. Sorting and Searching Algorithms  
+6.3. Dynamic Programming and Recursion  
+6.4. Hashing and Caching Techniques  
+6.5. Algorithmic Complexity Analysis (Big-O Notation)  
+
+---
+
+### **7. Applied Mathematics and Statistics**
+7.1. Probability Distributions (Gaussian, Bernoulli, etc.)  
+7.2. Hypothesis Testing and p-values  
+7.3. Linear Algebra (Matrix Multiplications, Eigenvalues, Singular Value Decomposition)  
+7.4. Calculus (Gradients, Partial Derivatives, Chain Rule)  
+7.5. Optimization Techniques (Convex Optimization, Gradient Descent)  
+
+---
+
+### **8. Behavioral Questions**
+8.1. Leadership and Team Collaboration  
+8.2. Conflict Resolution and Decision Making  
+8.3. Project Management and Delivery  
+8.4. Communication Skills (Explaining ML Concepts to Non-Technical Stakeholders)  
+8.5. Handling Ambiguity and Setting Priorities  
+
+---
+
+### **9. Domain-Specific Knowledge**
+9.1. Industry-Specific Use Cases (e.g., Finance, Healthcare, Retail)  
+9.2. Compliance and Ethical AI Practices  
+9.3. Interpretability and Explainability in ML Models  
+
+---
+
+### **10. Case Studies and Practical Scenarios**
+10.1. Designing an End-to-End ML Solution  
+10.2. Debugging a Model That Performs Poorly  
+10.3. Optimizing Model Inference Time for Production  
+10.4. Handling Imbalanced Datasets or Noisy Data  
+10.5. Scaling a Model to Handle Large Traffic  
+
+---
+
