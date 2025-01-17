@@ -158,17 +158,68 @@ class GemmaRotaryEmbedding(nn.Module):
         super().__init__()
 
         self.dim = dim # it is set to head_dim # as rope mpodify attention mechansim and attention mechansim is performed independently for each heaad so each head will hav eits own postional encoding applied to.
-        self.max_position_embeddings =  max_position_embeddings
-        self.base = base
+        self.max_position_embeddings =  max_position_embeddings # 8000
+        self.base = base # 10000
+
 
 
         # calculate  the theta according to  the formula theta_i =base^(2i/dim) where i =0,1,....., dim//2
+        # x^-3 == 1/x^3 
+        # torch.arange is craeting [0,2,4,6,...., d/2]
         inv_freq = 1.0/(self.base ** (torch.arange(0, self.dim, 2, dtype=torch.int64).float()/ self.dim))
         self.register_buffer(
              "inv_freq",
-             tensor= = inv_freq,
+             tensor= inv_freq,
              persistent=False
         )
+    
+
+    @torch.no_grad()
+    def forward(self, x, position_ids, seq_len=None):
+        # x:[ bs, num_attention_heads, seq_len, head_size]
+        self.inv_freq.to(x.device)
+
+        # copy the inv_freq tensor forr batch in the sequence
+        # inv_freq_expanded: [batch_size, head_dim//2,1 ]
+        inv_freq_expanded = self.inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, -1)
+
+        # position_ids_expanded: [batch_size, 1, seq_len]
+        position_ids_expanded = position_ids[:, None,:].float()
+        device_type = x.device.type
+        device_type = device_type if isinstance(device_type, str) and device_type != 'mps' else "cpu"
+
+        with torch.autocast(device_type=device_type, enabled = False):# for mixed precision
+            # you dont always have to work with fp32, most gpus upport fp16 which makes computation faster and reduces memory but we loose some precision, a mixed autoprecision handles this for us.. but here we have disabled it
+            # multiply each theta  by the position ( which is the argument of the sin and cos functions)
+            # freqs: [batch_size, head_dim//2, 1 ] @ [batch_size, 1, seq_len]  -> [batch_size, seq_len, head_dim//2]
+            freqs = (inv_freq_expanded.float() @ position_ids_expanded.float()).transpose(1,2) # calculating mtheta
+            # emb = [batch_size, seq_len, head_dim)]
+            emb = torch.cat((freqs, freqs), dim=-1)# this is different form paeper.. becasue iin paper for each dimension pair we needto calculate same mtheta, we arejust caluclatin once.. for examole insead of theta_1, theta_1, theta_2, theta_2 we are fdoing theta_1, theta_2 
+            # cos, sin : [batch_size, seq_len, head_dim]  # it is because hf did premute first, so now its just doing it again to remove its effect  # because of the permutaion done to wk and wq projections
+            cos=emb.cos()
+            sin = emb.sin()
+
+        return cos.to(dtype=x.dtype), sin.to(dtype=x.dtype)
+    
+
+    def rotate_half(x):
+        # build the [-x2, x1, -x4, x3...] tensor for sin part   
+        x1 = x[..., :x.shape[-1]//2] # takes the first hald of the last dimension
+        x2 = x[..., x.shape[-1]//2:] # takes the second half of the last dimnesion
+        return torch.cat((-x2, x1), dim=-1) # we are doing [-513, -512, -511, ....0,,,,,511, 51]
+
+    def apply_rotary_pos_emb(q, k, cos, sin, unsqueeze_dim=1):
+        cos = cos.unsqueeze(unsqueeze_dim) # add head_dim
+        sin = sin.unsqueeze(unsqueeze_dim) # add head_dim
+
+        # apply formula(34) to the roraty positional encoding paper
+        q_embed = (q*cos) + (rotate_half(q) * sin)
+        k_embed = (k*cos) + (rotate_half(k) * sin)
+        return q_embed, k_embed
+
+
+
+
 
 
 
@@ -327,7 +378,7 @@ class GemmaAttention(nn.Module):
                 # apply roatary position encoding
                 # we are just modifying these embeddings by adding some positional information
                 #[batch_size, seq_len, heqd_dim] -> [batch_size, seq_len, head_dim]
-                cos, sin = self.rotary_emb(value_states, position_ids, seq_len=None)
+                cos, sin = self.rotary_emb(value_states, position_ids, seq_len=None)i# value_states is just used to compute datatype, positiopn_ids are m
                 
                 #[batch_size, num_heads_q, seq_len, head_dim] -> [batch_size, num_head_kv, seq_len, head_dim]
                 query_states, key_states = self.apply_rotary_pos_emb(query_states, key_states, cos, sin)
