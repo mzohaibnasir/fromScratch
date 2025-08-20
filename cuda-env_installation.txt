@@ -1,0 +1,84 @@
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb
+
+sudo apt-get update
+sudo apt-get upgrade
+	
+
+
+sudo apt install nvidia-cuda-toolkit
+
+
+sudo apt-get install -y cuda-drivers
+
+
+
+# INSTALLING CONDA
+
+wget https://repo.anaconda.com/archive/Anaconda3-2024.06-1-Linux-x86_64.sh
+
+
+
+bash A*
+
+# CONDA REBOOT
+sudo reboot
+conda create --name open -y
+conda activate open
+
+conda config --add channels conda-forge
+conda install python=3.10.0 -y
+conda install open3d -y
+
+
+
+
+
+# update after installation
+
+
+
+conda install pytorch torchvision torchaudio pytorch-cuda=12.4 -c pytorch -c nvidia
+
+pip install opencv-python
+
+
+pip install tqdm
+
+sudo apt install npm
+
+
+
+pip install ultralytics
+
+
+sudo npm install pm2 -g
+
+
+
+
+pip install ultralytics
+
+
+
+
+
+
+
+
+sudo apt update
+sudo apt install xvfb -y
+
+
+Xvfb :99 -screen 0 1024x768x16 &
+
+
+export DISPLAY=:99
+
+
+glxinfo | grep OpenGL
+
+
+
